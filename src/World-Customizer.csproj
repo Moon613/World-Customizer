@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <LangVersion>Latest</LangVersion>
+        <PathMap>$(MSBuildProjectDirectory)=/World-Customizer</PathMap>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <OutDir>../Build</OutDir>
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <Reference Include="../lib/*.dll">
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <PackageReference Include="Sayers.SDL2.Core" Version="1.0.11" />
+    </ItemGroup>
+	
+</Project>
