@@ -13,10 +13,13 @@ internal class Program {
     private static IntPtr window;
     private static IntPtr renderer;
     private static bool running = true;
-    private static readonly OptionBar optionBar = new OptionBar(new List<string>{"File", "Preferences"}, null);
     internal static IntPtr ComicMono;
     internal static bool mouseDown = false;
     internal static bool clicked = false;
+
+    #pragma warning disable CS8618
+    private static Window mainWindow;
+    #pragma warning restore CS8618
 
     /// <summary>
     /// Program entry-point
@@ -27,7 +30,7 @@ internal class Program {
         while (running) {
             PollEvents();
             Render();
-            optionBar.Update();
+            mainWindow.Update();
             clicked = false;
         }
 
@@ -62,6 +65,15 @@ internal class Program {
         if (ComicMono == IntPtr.Zero) {
             Console.WriteLine("There was an error reading ComicMono");
         }
+
+        SDL.SDL_GetWindowSize(window, out int w, out int h);
+        mainWindow = new Window(new Vector2(0, 0), new Vector2(w, h));
+        OptionBar optionBar = new OptionBar(mainWindow);
+        mainWindow.AddChild(optionBar);
+        optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
+            new Tuple<string, Action<Button>>("File", optionBar.OpenFileContextMenu),
+            new Tuple<string, Action<Button>>("Preferences", new Action<Button>(optionBar.OpenPreferencesContextMenu))
+            }, optionBar, new Vector2(0, 0), 14, 5, 8));
     }
 
     /// <summary>
@@ -97,7 +109,7 @@ internal class Program {
 
         // Draw stuff here
         SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        optionBar.Render(window, renderer);
+        mainWindow.Render(window, renderer);
 
         // Switches out the currently presented render surface with the one we just did work on
         SDL.SDL_RenderPresent(renderer);
@@ -186,6 +198,7 @@ interface IRenderable {
 }
 /// <summary>
 /// This interface signifies that a class is dynamic and requires an Update function, as well as a way to talk to it's parent
+/// </summary>
 interface IAmInteractable {
     IAmInteractable Parent {get; set;}
     void Signal(string text);
@@ -195,53 +208,26 @@ interface IAmInteractable {
 /// The top menu bar, always present and provides a way to save, load, set preferences, ect.
 /// </summary>
 internal class OptionBar : IRenderable, IAmInteractable {
-    readonly List<string> options;
+    List<Button>? options;
     ContextMenu? contextMenu;
     public IAmInteractable Parent { get; set; }
-    internal OptionBar(List<string> options, IAmInteractable parent) {
-        this.options = options;
+    internal OptionBar(IAmInteractable parent) {
         this.Parent = parent;
         contextMenu = null;
+    }
+    internal void AssignButtons(List<Button> buttons) {
+        options = buttons;
     }
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetWindowSize(window, out int width, out _);
         
         // Draw a background light grey rectangle
         SDL.SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
-        var rect = new SDL.SDL_Rect() {x = 0, y = 0, w = width, h = 30};
+        var rect = new SDL.SDL_Rect() {x = 0, y = 0, w = width, h = 32};
         SDL.SDL_RenderFillRect(renderer, ref rect);
 
-        int x = 5;
-        foreach (string opt in options) {
-            // Get some data stuff needed to draw extra rectangles
-            SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-            SDL_ttf.TTF_SizeText(Program.ComicMono, opt, out int autoWidth, out _);
-            int textWidth = autoWidth / (1 + opt.Count(x => x == '\n'));
-
-            // If the mouse if hovering over the current option, give it a different background
-            if (mouseX >= x-5 && mouseX < x + textWidth + 5 && mouseY <= 30 && contextMenu == null) {
-                var r = new SDL.SDL_Rect() {x = x-5, y = 0, w = textWidth+10, h = 30};
-                SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
-                SDL.SDL_RenderFillRect(renderer, ref r);
-                if (Program.clicked) {
-                    #pragma warning disable CS8604
-                    List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action>>{
-                        new Tuple<string, Action>("File", new Action(() => {Console.WriteLine("Clicked the File button");})),
-                        new Tuple<string, Action>("Save", new Action(() => {Console.WriteLine("Clicked on the Save button");})),
-                        new Tuple<string, Action>("Save As", new Action(() => {Console.WriteLine("Clicked on the Save As button");})),
-                        new Tuple<string, Action>("New", new Action(() => {Console.WriteLine("Clicked on the New button");})),
-                        new Tuple<string, Action>("Load", new Action(() => {Console.WriteLine("Clicked on the Load button");}))
-                    }, contextMenu, new Vector2(0, 30), 5, 2);
-                    contextMenu = new ContextMenu(buttons, new Vector2(0, 30), new Vector2(5, 2), this);
-                    #pragma warning restore CS8604
-                }
-            }
-
-            // Draw the text
-            Program.WriteText(renderer, window, opt, Program.ComicMono, x, 8, 14);
-            
-            // Set the x position of the next option 10 pixels after the current option
-            x += textWidth + 10;
+        foreach (Button opt in options) {
+            opt.Render(window, renderer);
         }
 
         // This draws the white border
@@ -252,36 +238,57 @@ internal class OptionBar : IRenderable, IAmInteractable {
         contextMenu?.Render(window, renderer);
     }
     public void Update() {
-        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        Vector2 mousePos = new Vector2(mouseX, mouseY);
-        if (contextMenu != null && Vector2.Distance(mousePos, contextMenu.position) > 75) {
-            contextMenu.focused = true;
-        }
         contextMenu?.Update();
+        foreach (Button button in options) {
+            button.Update();
+        }
     }
     public void Signal(string text) {
         if (text == ContextMenu.RemoveCtxMenu) {
             contextMenu = null;
         }
     }
+    public void OpenFileContextMenu(Button _) {
+        Console.WriteLine("Opened the File Context Menu");
+        #pragma warning disable CS8604, IDE0090, IDE0028
+        contextMenu = new ContextMenu(new Vector2(0, 32), this);
+        List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
+            new Tuple<string, Action<Button>>("File", new Action<Button>(_ => {Console.WriteLine("Clicked the File button");})),
+            new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save button");})),
+            new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save As button");})),
+            new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Console.WriteLine("Clicked on the New button");})),
+            new Tuple<string, Action<Button>>("Load", new Action<Button>(_ => {Console.WriteLine("Clicked on the Load button");}))
+        }, contextMenu, new Vector2(0, 32), 14, 5, 2);
+        contextMenu.AssignButtons(buttons, new Vector2(5, 2));
+        #pragma warning restore CS8604, IDE0090, IDE0028
+    }
+    public void OpenPreferencesContextMenu(Button _) {
+        Console.WriteLine("Clicked on the Preferences Tab");
+        contextMenu = new ContextMenu(new Vector2(42, 32), this);
+        List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
+            new Tuple<string, Action<Button>>("Background Color", new Action<Button>(_ => {Console.WriteLine("Clicked the bkg clr button");}))
+        }, contextMenu, new Vector2(42, 32), 14, 5, 2);
+        contextMenu.AssignButtons(buttons, new Vector2(5, 2));
+    }
 }
 /// <summary>
 /// A small menu that pops up when clicking or right-clicking on a parent to provide options what to do.
 class ContextMenu : IRenderable, IAmInteractable {
-    readonly List<Button> options;
+    List<Button>? options;
     readonly internal Vector2 position;
-    readonly internal int width;
-    readonly internal int height;
+    internal int width;
+    internal int height;
     internal bool focused;
     internal const string RemoveCtxMenu = "REMOVECTXMENU";
     internal const int GraceDistance = 5;
     public IAmInteractable Parent { get; set; }
-    internal ContextMenu(List<Button> options, Vector2 position, Vector2 textOffset, IAmInteractable parent) {
-        this.options = options;
+    internal ContextMenu(Vector2 position, IAmInteractable parent) {
         this.position = position;
         this.Parent = parent;
         this.focused = false;
-
+    }
+    public void AssignButtons(List<Button> buttons, Vector2 textOffset) {
+        options = buttons;
         int totalHeight = 0;
         foreach (Button button in options) {
             SDL_ttf.TTF_SizeText(Program.ComicMono, button.text, out _, out int h);
@@ -302,13 +309,18 @@ class ContextMenu : IRenderable, IAmInteractable {
             opt.Render(window, renderer);
         }
 
-        if (focused && (mouseX < position.X-GraceDistance || mouseX > position.X+width+GraceDistance || mouseY < position.Y-GraceDistance || mouseY > position.Y+height+GraceDistance)) {
-            Signal(RemoveCtxMenu);
-        }
     }
     public void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        if (focused && (mouseX < position.X-GraceDistance || mouseX > position.X+width+GraceDistance || mouseY < position.Y-GraceDistance || mouseY > position.Y+height+GraceDistance)) {
+            Signal(RemoveCtxMenu);
+        }
         if (!focused && mouseX >= position.X-GraceDistance && mouseX < position.X+width+GraceDistance && mouseY >= position.Y-GraceDistance && mouseY <= position.Y+height+GraceDistance) {
+            focused = true;
+        }
+        // This will set focused to true is the mouse is too far away, which then leads to the context menu closing because of the first conditional in this function.
+        // This can't immediantly remove the menu, because if it did then it would despawn immediantly when opened due to the mouse being too far away.
+        if (mouseX < position.X-30 || mouseX > position.X+width+30 || mouseY < position.Y-30 || mouseY > position.Y+height+30) {
             focused = true;
         }
         foreach(Button button in options) {
@@ -324,21 +336,23 @@ class ContextMenu : IRenderable, IAmInteractable {
 }
 
 class Button : IRenderable, IAmInteractable {
-    readonly Action function;
+    internal event Action<Button> Clicked;
     internal string text;
     Vector2 position;
     Vector2 textOffset;
     readonly int width;
     readonly int height;
+    readonly int ptsize;
     public IAmInteractable Parent { get; set; }
-    internal Button(string text, IAmInteractable parent, Vector2 position, int width, int height, Vector2 textOffset, Action function) {
+    internal Button(string text, IAmInteractable parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, Action<Button> action) {
         this.text = text;
-        this.function = function;
         this.Parent = parent;
         this.position = position;
+        this.ptsize = ptsize;
         this.width = width + 2*(int)textOffset.X;
         this.height = height + 2*(int)textOffset.Y;
         this.textOffset = textOffset;
+        this.Clicked += action;
     }
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
@@ -347,48 +361,82 @@ class Button : IRenderable, IAmInteractable {
             SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
             SDL.SDL_RenderFillRect(renderer, ref r);
         }
-        Program.WriteText(renderer, window, text, Program.ComicMono, (int)position.X+(int)textOffset.X, (int)position.Y+(int)textOffset.Y, 14);
+        Program.WriteText(renderer, window, text, Program.ComicMono, (int)position.X+(int)textOffset.X, (int)position.Y+(int)textOffset.Y, ptsize);
     }
     public void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (Program.clicked && mouseX >= position.X && mouseX <= position.X+width && mouseY >= position.Y && mouseY <= position.Y+height) {
-            function();
+        if (Program.clicked && mouseX >= position.X && mouseX < position.X+width && mouseY >= position.Y && mouseY < position.Y+height) {
+            Clicked.Invoke(this);
         }
     }
     public void Signal(string text) {
-        throw new NotImplementedException();
+        Parent.Signal(text);
     }
-    public static List<Button> CreateButtonsVertical(List<Tuple<string, Action>> list, IAmInteractable parent, Vector2 position, int xOffset, int yOffset) {
+    public static List<Button> CreateButtonsVertical(List<Tuple<string, Action<Button>>> list, IAmInteractable parent, Vector2 position, int ptsize, int xOffset, int yOffset) {
         List<Button> buttonList = new();
         Vector2 drawPosition = position;
+        SDL_ttf.TTF_SetFontSize(Program.ComicMono, ptsize);
         SDL_ttf.TTF_SizeText(Program.ComicMono, list.Aggregate("", (max, cur) => max.Length > cur.Item1.Length ? max : cur.Item1), out int width, out _);
 
-        foreach (Tuple<string, Action> pair in list) {
+        foreach (Tuple<string, Action<Button>> pair in list) {
             SDL_ttf.TTF_SizeText(Program.ComicMono, pair.Item1, out _, out int height);
-            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, new Vector2(xOffset, yOffset), pair.Item2));
+            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), pair.Item2));
             drawPosition.Y += height+2*yOffset;
+        }
+
+        return buttonList;
+    }
+    public static List<Button> CreateButtonsHorizontal(List<Tuple<string, Action<Button>>> list, IAmInteractable parent, Vector2 postition, int ptsize, int xOffset, int yOffset) {
+        List<Button> buttonList = new();
+        Vector2 drawPosition = postition;
+        SDL_ttf.TTF_SetFontSize(Program.ComicMono, ptsize);
+        int height = list.Aggregate(0, (max, cur) => {
+                SDL_ttf.TTF_SizeText(Program.ComicMono, cur.Item1, out _, out int h);
+                return max > h ? max : h;            
+            });
+
+        foreach (Tuple<string, Action<Button>> pair in list) {
+            SDL_ttf.TTF_SizeText(Program.ComicMono, pair.Item1, out int width, out _);
+            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), pair.Item2));
+            drawPosition.X += width+2*xOffset;
         }
 
         return buttonList;
     }
 }
 
-class Window : IRenderable {
-    List<IRenderable> children;
-    Vector2 position;
-    Vector2 size;
-    Window(Vector2 position, Vector2 size) {
+class Window : IRenderable, IAmInteractable {
+    internal readonly List<IRenderable> renderables;
+    internal readonly List<IAmInteractable> updatables;
+    internal Vector2 position;
+    internal Vector2 size;
+    public IAmInteractable Parent { get; set; }
+    internal Window(Vector2 position, Vector2 size) {
         this.position = position;
         this.size = size;
-        this.children = new List<IRenderable>();
+        this.Parent = null;
+        this.renderables = new List<IRenderable>();
+        this.updatables = new List<IAmInteractable>();
     }
-
+    public void AddChild(object child) {
+        if (child is IRenderable renderable) {
+            renderables.Add(renderable);
+        }
+        if (child is IAmInteractable interactable) {
+            updatables.Add(interactable);
+        }
+    }
     public void Render(IntPtr window, IntPtr renderer) {
-        foreach (IRenderable child in children) {
+        
+        foreach (IRenderable child in renderables) {
             child.Render(window, renderer);
         }
     }
-
-    void Update() {
+    public void Signal(string text) {
+    }
+    public void Update() {
+        foreach (IAmInteractable child in updatables) {
+            child.Update();
+        }
     }
 }
