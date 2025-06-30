@@ -16,6 +16,7 @@ internal class Program {
     internal static IntPtr ComicMono;
     internal static bool mouseDown = false;
     internal static bool clicked = false;
+    internal static Color backgroundColor;
 
     #pragma warning disable CS8618
     private static Window mainWindow;
@@ -265,10 +266,17 @@ internal class OptionBar : IRenderable, IAmInteractable {
     public void OpenPreferencesContextMenu(Button _) {
         Console.WriteLine("Clicked on the Preferences Tab");
         contextMenu = new ContextMenu(new Vector2(42, 32), this);
+
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
-            new Tuple<string, Action<Button>>("Background Color", new Action<Button>(_ => {Console.WriteLine("Clicked the bkg clr button");}))
+            new Tuple<string, Action<Button>>("Background Color", OpenBackgroundColorSelector)
         }, contextMenu, new Vector2(42, 32), 14, 5, 2);
+
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
+    }
+    public void OpenBackgroundColorSelector(Button _) {
+        Console.WriteLine("Clicked the background color selector button");
+        ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), Parent);
+        ((Window)Parent).AddChild(colorSelector);
     }
 }
 /// <summary>
@@ -334,7 +342,123 @@ class ContextMenu : IRenderable, IAmInteractable {
         
     }
 }
+class ColorSelector : IRenderable, IAmInteractable {
+    Vector2 position;
+    Vector2 size;
+    readonly Slider rSlider, gSlider, bSlider;
+    readonly Button apply;
+    public IAmInteractable Parent { get; set; }
+    internal ColorSelector(Vector2 position, IAmInteractable parent) {
+        this.position = position;
+        this.Parent = parent;
+        size = new Vector2(300, 300);
+        rSlider = new Slider(position + new Vector2(20, 270), new Vector2(73, 20), this, 0, 255, true);
+        gSlider = new Slider(position + new Vector2(113, 270), new Vector2(73, 20), this, 0, 255, true);
+        bSlider = new Slider(position + new Vector2(206, 270), new Vector2(73, 20), this, 0, 255, true);
+        apply = new Button("Apply", this, position+new Vector2(110, 240), 48, 19, 16, new Vector2(18, 2), ApplyColorToParentWindow);
+    }
+    public void ApplyColorToParentWindow(Button _) {
+        ((Window)Parent).backgroundColor = Color.FromArgb(255, (int)rSlider.value, (int)gSlider.value, (int)bSlider.value);
+    }
+    public void Render(IntPtr window, IntPtr renderer) {
+        SDL.SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
+        var r = new SDL.SDL_Rect(){x=(int)position.X, y=(int)position.Y, w=(int)size.X, h=(int)size.Y};
+        SDL.SDL_RenderFillRect(renderer, ref r);
 
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL.SDL_RenderDrawRect(renderer, ref r);
+        rSlider.Render(window, renderer);
+        gSlider.Render(window, renderer);
+        bSlider.Render(window, renderer);
+        apply.Render(window, renderer);
+        
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL.SDL_RenderDrawRect(renderer, ref r);
+    }
+    public void Signal(string text) {
+        
+    }
+    public void Update() {
+        rSlider.Update();
+        gSlider.Update();
+        bSlider.Update();
+        apply.Update();
+    }
+}
+class Slider : IRenderable, IAmInteractable {
+    Vector2 position;
+    Vector2 size;
+    Vector2 sliderPosition;
+    Vector2 sliderSize;
+    Vector2 mouseRelativeGrabPos;
+    readonly float minSliderPos;
+    readonly float maxSliderPos;
+    readonly float min;
+    readonly float max;
+    internal float value;
+    readonly bool horizontal;
+    bool grabbed;
+    public IAmInteractable Parent { get; set; }
+    internal Slider(Vector2 position, Vector2 size, IAmInteractable parent, float min, float max, bool horizontal) {
+        this.position = position;
+        this.size = size;
+        this.Parent = parent;
+        this.min = min;
+        this.max = max;
+        value = min;
+        grabbed = false;
+        this.horizontal = horizontal;
+        if (horizontal) {
+            this.sliderPosition = new Vector2(position.X, position.Y+5);
+            this.sliderSize = new Vector2(10, size.Y-10);
+            this.minSliderPos = position.X;
+            this.maxSliderPos = position.X + size.X - sliderSize.X;
+        }
+        else {
+            this.sliderPosition = new Vector2(position.X+5, position.Y);
+            this.sliderSize = new Vector2(size.X-10, 10);
+            this.minSliderPos = position.Y;
+            this.maxSliderPos = position.Y + size.Y - sliderSize.Y;
+        }
+    }
+    public void Render(IntPtr window, IntPtr renderer) {
+        SDL.SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
+        var r = new SDL.SDL_Rect(){x=(int)position.X, y=(int)position.Y, w=(int)size.X, h=(int)size.Y};
+        SDL.SDL_RenderFillRect(renderer, ref r);
+        var sliderRect = new SDL.SDL_Rect(){x=(int)sliderPosition.X, y=(int)sliderPosition.Y, w=(int)sliderSize.X, h=(int)sliderSize.Y};
+
+        if (horizontal) {
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL.SDL_RenderDrawLineF(renderer, position.X+5, position.Y+size.Y/2, position.X+size.X-5, position.Y+size.Y/2);
+            if (grabbed) {
+                SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
+            }
+            SDL.SDL_RenderFillRect(renderer, ref sliderRect);
+        }
+
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL.SDL_RenderDrawRect(renderer, ref r);
+    }
+    public void Signal(string text) {
+        
+    }
+    public void Update() {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        if (!grabbed && Program.clicked && mouseX > sliderPosition.X && mouseX < sliderPosition.X+sliderSize.X && mouseY > sliderPosition.Y && mouseY < sliderPosition.Y+sliderSize.Y) {
+            grabbed = true;
+            mouseRelativeGrabPos = new Vector2(mouseX, mouseY) - sliderPosition;
+        }
+        if (grabbed && !Program.mouseDown) {
+            grabbed = false;
+        }
+        if (grabbed) {
+            if (horizontal) {
+                sliderPosition.X = Math.Max(minSliderPos, Math.Min(maxSliderPos, mouseX - mouseRelativeGrabPos.X));
+                value = Utils.LerpMap(min, max, minSliderPos, maxSliderPos, sliderPosition.X);
+            }
+        }
+    }
+}
 class Button : IRenderable, IAmInteractable {
     internal event Action<Button> Clicked;
     internal string text;
@@ -410,6 +534,7 @@ class Window : IRenderable, IAmInteractable {
     internal readonly List<IAmInteractable> updatables;
     internal Vector2 position;
     internal Vector2 size;
+    internal Color backgroundColor;
     public IAmInteractable Parent { get; set; }
     internal Window(Vector2 position, Vector2 size) {
         this.position = position;
@@ -417,6 +542,7 @@ class Window : IRenderable, IAmInteractable {
         this.Parent = null;
         this.renderables = new List<IRenderable>();
         this.updatables = new List<IAmInteractable>();
+        this.backgroundColor = Color.FromArgb(255, 8, 38, 82);
     }
     public void AddChild(object child) {
         if (child is IRenderable renderable) {
@@ -427,16 +553,34 @@ class Window : IRenderable, IAmInteractable {
         }
     }
     public void Render(IntPtr window, IntPtr renderer) {
-        
-        foreach (IRenderable child in renderables) {
-            child.Render(window, renderer);
+        SDL.SDL_SetRenderDrawColor(renderer, backgroundColor.R, backgroundColor.G, backgroundColor.B, backgroundColor.A);
+        var r = new SDL.SDL_Rect(){x=0, y=0, w=(int)size.X, h=(int)size.Y};
+        SDL.SDL_RenderFillRect(renderer, ref r);
+
+        SDL.SDL_SetRenderDrawColor(renderer, 128, 128, 128, 1);
+        for (int i = 25; i < size.X; i+=50) {
+            SDL.SDL_RenderDrawLine(renderer, i, 0, i, (int)size.Y);
+        }
+        for (int i = 25; i < size.Y; i+=50) {
+            SDL.SDL_RenderDrawLine(renderer, 0, i, (int)size.X, i);
+        }
+        try {
+            for (int i = 0; i < renderables.Count; i++) {
+                renderables[i].Render(window, renderer);
+            }
+        } catch (Exception err) {
+            Console.WriteLine(err);
         }
     }
     public void Signal(string text) {
     }
     public void Update() {
-        foreach (IAmInteractable child in updatables) {
-            child.Update();
+        try {
+            for (int i = 0; i < updatables.Count; i++) {
+                updatables[i].Update();
+            }
+        } catch (Exception err) {
+            Console.WriteLine(err);
         }
     }
 }
