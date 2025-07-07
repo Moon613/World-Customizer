@@ -1,9 +1,9 @@
 using System;
-using SDL2;
 using System.Linq;
 using System.Drawing;
 using System.Collections.Generic;
 using System.Numerics;
+using SDL2;
 
 namespace WorldCustomizer;
 #pragma warning disable CA1806
@@ -346,8 +346,11 @@ class ColorSelector : IRenderable, IAmInteractable {
     Vector2 position;
     Vector2 size;
     readonly Slider rSlider, gSlider, bSlider;
-    readonly Button apply;
+    readonly Button applyButton;
+    readonly Button closeButton;
     public IAmInteractable Parent { get; set; }
+    readonly List<SDL.SDL_Vertex> verticies;
+    const int RAD = 60;
     internal ColorSelector(Vector2 position, IAmInteractable parent) {
         this.position = position;
         this.Parent = parent;
@@ -355,10 +358,43 @@ class ColorSelector : IRenderable, IAmInteractable {
         rSlider = new Slider(position + new Vector2(20, 270), new Vector2(73, 20), this, 0, 255, true);
         gSlider = new Slider(position + new Vector2(113, 270), new Vector2(73, 20), this, 0, 255, true);
         bSlider = new Slider(position + new Vector2(206, 270), new Vector2(73, 20), this, 0, 255, true);
-        apply = new Button("Apply", this, position+new Vector2(110, 240), 48, 19, 16, new Vector2(18, 2), ApplyColorToParentWindow);
+        applyButton = new Button("Apply", this, position+new Vector2(110, 240), 48, 19, 16, new Vector2(18, 2), true, ApplyColorToParentWindow);
+        closeButton = new Button("X", this, position+new Vector2(273, 5), 12, 20, 22, new Vector2(5, 5), true, Close);
+        
+        float horizontalPosDist = RAD;
+        float verticalPosDist = 0.5f*RAD;
+        verticies = [
+            // Triangle 1: Red-Orange/Yellow
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=-RAD}, color=new SDL.SDL_Color(){r=255, g=0, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=horizontalPosDist, y=-verticalPosDist}, color=new SDL.SDL_Color(){r=255, g=255, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}},
+            // Triangle 2: Orange/Yellow-Green
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=horizontalPosDist, y=-verticalPosDist}, color=new SDL.SDL_Color(){r=255, g=255, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=horizontalPosDist, y=verticalPosDist}, color=new SDL.SDL_Color(){r=0, g=255, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}},
+            // Triangle 3: Green-Teal
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=horizontalPosDist, y=verticalPosDist}, color=new SDL.SDL_Color(){r=0, g=255, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=RAD}, color=new SDL.SDL_Color(){r=0, g=255, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}},
+            // Triangle 4: Teal-Blue
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=RAD}, color=new SDL.SDL_Color(){r=0, g=255, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=-horizontalPosDist, y=verticalPosDist}, color=new SDL.SDL_Color(){r=0, g=0, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}},
+            // Triangle 5: Blue-Purple
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=-horizontalPosDist, y=verticalPosDist}, color=new SDL.SDL_Color(){r=0, g=0, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=-horizontalPosDist, y=-verticalPosDist}, color=new SDL.SDL_Color(){r=255, g=0, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}},
+            // Triangle 6: Purple-Red
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=-horizontalPosDist, y=-verticalPosDist}, color=new SDL.SDL_Color(){r=255, g=0, b=255, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=-RAD}, color=new SDL.SDL_Color(){r=255, g=0, b=0, a=255}},
+            new SDL.SDL_Vertex(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255, g=255, b=255, a=255}}
+        ];
     }
     public void ApplyColorToParentWindow(Button _) {
         ((Window)Parent).backgroundColor = Color.FromArgb(255, (int)rSlider.value, (int)gSlider.value, (int)bSlider.value);
+    }
+    public void Close(Button _) {
+        ((Window)Parent).RemoveChild(this);
     }
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
@@ -370,10 +406,26 @@ class ColorSelector : IRenderable, IAmInteractable {
         rSlider.Render(window, renderer);
         gSlider.Render(window, renderer);
         bSlider.Render(window, renderer);
-        apply.Render(window, renderer);
+        applyButton.Render(window, renderer);
+        closeButton.Render(window, renderer);
+        Utils.DrawGeometryWithVertices(renderer, position + new Vector2(size.X/2, RAD+RAD/2), verticies.ToArray());
+        Vector2 calculated = new Vector2(0, -RAD)*(rSlider.value/255)
+            + new Vector2(RAD, 0)*(gSlider.value/255)
+            + new Vector2(-RAD, 0)*(bSlider.value/255)
+            + new Vector2(0, RAD)*((gSlider.value+bSlider.value)/(255*2))
+            + (position + new Vector2(size.X/2, RAD+RAD/2));
+        // Change the color of the center of the hexagon to show white/black
+        byte blackWhiteVal = (byte)(0.2f*rSlider.value + 0.7f*gSlider.value + 0.1f*bSlider.value);
+        for (int i = 2; i < verticies.Count; i += 3) {
+            verticies[i] = verticies[i] with {color=new(){r=blackWhiteVal, g=blackWhiteVal, b=blackWhiteVal}};
+        }
+
+        SDL.SDL_SetRenderDrawColor(renderer, (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), 255);
+        SDL.SDL_RenderDrawLineF(renderer, position.X + size.X/2, position.Y+RAD+RAD/2, calculated.X, calculated.Y);
         
         SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL.SDL_RenderDrawRect(renderer, ref r);
+
     }
     public void Signal(string text) {
         
@@ -382,7 +434,8 @@ class ColorSelector : IRenderable, IAmInteractable {
         rSlider.Update();
         gSlider.Update();
         bSlider.Update();
-        apply.Update();
+        applyButton.Update();
+        closeButton.Update();
     }
 }
 class Slider : IRenderable, IAmInteractable {
@@ -467,8 +520,9 @@ class Button : IRenderable, IAmInteractable {
     readonly int width;
     readonly int height;
     readonly int ptsize;
+    readonly bool hasBorder;
     public IAmInteractable Parent { get; set; }
-    internal Button(string text, IAmInteractable parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, Action<Button> action) {
+    internal Button(string text, IAmInteractable parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) {
         this.text = text;
         this.Parent = parent;
         this.position = position;
@@ -476,14 +530,20 @@ class Button : IRenderable, IAmInteractable {
         this.width = width + 2*(int)textOffset.X;
         this.height = height + 2*(int)textOffset.Y;
         this.textOffset = textOffset;
+        this.hasBorder = hasBorder;
         this.Clicked += action;
     }
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        var r = new SDL.SDL_Rect() {x = (int)position.X, y = (int)position.Y, w = width, h = height};
+        
         if (mouseX >= position.X && mouseX < position.X+width && mouseY >= position.Y && mouseY < position.Y+height) {
-            var r = new SDL.SDL_Rect() {x = (int)position.X, y = (int)position.Y, w = width, h = height};
             SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
             SDL.SDL_RenderFillRect(renderer, ref r);
+        }
+        if (hasBorder) {
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL.SDL_RenderDrawRect(renderer, ref r);
         }
         Program.WriteText(renderer, window, text, Program.ComicMono, (int)position.X+(int)textOffset.X, (int)position.Y+(int)textOffset.Y, ptsize);
     }
@@ -504,7 +564,7 @@ class Button : IRenderable, IAmInteractable {
 
         foreach (Tuple<string, Action<Button>> pair in list) {
             SDL_ttf.TTF_SizeText(Program.ComicMono, pair.Item1, out _, out int height);
-            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), pair.Item2));
+            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), false, pair.Item2));
             drawPosition.Y += height+2*yOffset;
         }
 
@@ -521,7 +581,7 @@ class Button : IRenderable, IAmInteractable {
 
         foreach (Tuple<string, Action<Button>> pair in list) {
             SDL_ttf.TTF_SizeText(Program.ComicMono, pair.Item1, out int width, out _);
-            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), pair.Item2));
+            buttonList.Add(new Button(pair.Item1, parent, drawPosition, width, height, ptsize, new Vector2(xOffset, yOffset), false, pair.Item2));
             drawPosition.X += width+2*xOffset;
         }
 
@@ -550,6 +610,14 @@ class Window : IRenderable, IAmInteractable {
         }
         if (child is IAmInteractable interactable) {
             updatables.Add(interactable);
+        }
+    }
+    public void RemoveChild(object child) {
+        if (child is IRenderable renderable) {
+            renderables.Remove(renderable);
+        }
+        if (child is IAmInteractable interactable) {
+            updatables.Remove(interactable);
         }
     }
     public void Render(IntPtr window, IntPtr renderer) {
