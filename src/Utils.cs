@@ -1,8 +1,11 @@
 using System;
+using System.Drawing;
+using System.Linq;
 using System.Numerics;
 using SDL2;
 
 namespace WorldCustomizer;
+#nullable enable
 
 public static class Utils {
     public static float LerpMap(float lowerRealVal, float upperRealVal, float lowerInverseLerpVal, float upperInverseLerpVal, float x) {
@@ -20,5 +23,68 @@ public static class Utils {
             verticies[i].position = new SDL.SDL_FPoint(){x=verticies[i].position.x+center.X, y=verticies[i].position.y+center.Y};
         }
         SDL.SDL_RenderGeometry(renderer, (IntPtr)null, verticies, verticies.Length, null, 0);
+    }
+    /// <summary>
+    /// Draws text to the screen, given a string and font, and has optional parameters for position, size, and text foreground color.<br />
+    /// If Color is left null, the text will be white.
+    /// </summary>
+    internal static void WriteText(IntPtr renderer, IntPtr window, string text, IntPtr font, int x = 0, int y = 0, int ptsize = 24, Color? color = null, int w = 0, int h = 0) {
+        if (font == IntPtr.Zero) {
+            return;
+        }
+
+        SDL_ttf.TTF_SetFontSize(font, ptsize);
+
+        SDL_ttf.TTF_SizeText(font, text, out int autoWidth, out int autoHeight);
+
+        if (w == 0) {
+            w = autoWidth / (1 + text.Count(x => x == '\n'));
+        }
+        if (h == 0) {
+            h = autoHeight * (1 + text.Count(x => x == '\n'));
+        }
+
+        // this is the color in rgb format,
+        // maxing out all would give you the color white,
+        // and it will be your text's color
+        SDL.SDL_Color convertedColor = new SDL.SDL_Color();
+        if (color == null) {
+            convertedColor.r = 255;
+            convertedColor.g = 255;
+            convertedColor.b = 255;
+            convertedColor.a = 255;
+        }
+        else {
+            convertedColor.r = color.Value.R;
+            convertedColor.g = color.Value.G;
+            convertedColor.b = color.Value.B;
+            convertedColor.a = color.Value.A;
+        }
+
+        // as TTF_RenderText_Solid could only be used on
+        // SDL_Surface then you have to create the surface first
+        IntPtr surfaceMessage = SDL_ttf.TTF_RenderUTF8_Solid_Wrapped(Program.ComicMono, text, convertedColor, 0); 
+
+        // now you can convert it into a texture
+        IntPtr Message = SDL.SDL_CreateTextureFromSurface(renderer, surfaceMessage);
+
+        SDL.SDL_Rect Message_rect = new SDL.SDL_Rect() {x = x, y = y, w = w, h = h}; //create a rect
+
+        // (0,0) is on the top left of the window/screen,
+        // think a rect as the text's box,
+        // that way it would be very simple to understand
+
+        // Now since it's a texture, you have to put RenderCopy
+        // in your game loop area, the area where the whole code executes
+
+        // you put the renderer's name first, the Message,
+        // the crop size (you can ignore this if you don't want
+        // to dabble with cropping), and the rect which is the size
+        // and coordinate of your texture
+        SDL.SDL_RenderCopy(renderer, Message, (IntPtr)null, ref Message_rect);
+
+        // Don't forget to free your surface and texture
+        SDL.SDL_FreeSurface(surfaceMessage);
+        SDL.SDL_DestroyTexture(Message);
     }
 }
