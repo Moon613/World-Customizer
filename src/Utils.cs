@@ -8,6 +8,7 @@ namespace WorldCustomizer;
 #nullable enable
 
 public static class Utils {
+    public static IntPtr currentFont;
     public static float LerpMap(float lowerRealVal, float upperRealVal, float lowerInverseLerpVal, float upperInverseLerpVal, float x) {
         float newX = InverseLerp(x, lowerInverseLerpVal, upperInverseLerpVal);
         return Lerp(lowerRealVal, upperRealVal, newX);
@@ -63,7 +64,7 @@ public static class Utils {
 
         // as TTF_RenderText_Solid could only be used on
         // SDL_Surface then you have to create the surface first
-        IntPtr surfaceMessage = SDL_ttf.TTF_RenderUTF8_Solid_Wrapped(Program.ComicMono, text, convertedColor, 0); 
+        IntPtr surfaceMessage = SDL_ttf.TTF_RenderUTF8_Solid_Wrapped(currentFont, text, convertedColor, 0); 
 
         // now you can convert it into a texture
         IntPtr Message = SDL.SDL_CreateTextureFromSurface(renderer, surfaceMessage);

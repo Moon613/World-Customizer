@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 
 namespace WorldCustomizer;
 
@@ -12,7 +13,6 @@ interface IRenderable {
 /// This interface signifies that a class is dynamic and requires an Update function, as well as a way to talk to it's parent
 /// </summary>
 interface IAmInteractable {
-    IAmInteractable Parent {get; set;}
     void Signal(string text);
     void Update();
 }
