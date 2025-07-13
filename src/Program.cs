@@ -7,16 +7,19 @@ using SDL2;
 #pragma warning disable CA1806
 #nullable enable
 
+namespace WorldCustomizer;
+
 /// <summary>
 /// Program entry-point
 /// </summary>
 class Entry {
     static void Main(string[] args) {
-        WorldCustomizer.Program main = new();
+        Program main = new();
+        main.Setup();
 
         while (main.running) {
             main.PollEvents();
-            main.mainWindow.Update();
+            main.Update();
             main.Render();
             main.clicked = false;
         }
@@ -24,110 +27,141 @@ class Entry {
         main.CleanUp();
     }
 }
+internal class Program {
+    private IntPtr window;
+    private IntPtr renderer;
+    public bool running = true;
+    internal bool mouseDown = false;
+    internal bool clicked = false;
+    internal string? folderToLoadFrom = null;
 
-namespace WorldCustomizer
-{
-    internal class Program {
-        private IntPtr window;
-        private IntPtr renderer;
-        public bool running = true;
-        internal bool mouseDown = false;
-        internal bool clicked = false;
+    #pragma warning disable CS8618
+    internal Window mainWindow;
+    #pragma warning restore CS8618
 
-        #pragma warning disable CS8618
-        internal Window mainWindow;
-        internal Program() {
-            Setup();
-        }
-        #pragma warning restore CS8618
+    public void OpenFileBrowser() {
+        bool active = true;
+        IntPtr wnd = SDL.SDL_CreateWindow("File Browser", SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, 640, 360, SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS /*| SDL.SDL_WindowFlags.SDL_WINDOW_BORDERLESS*/);
+        IntPtr rend = SDL.SDL_CreateRenderer(wnd, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
+        FileBrowser browser = new FileBrowser(Directory.GetCurrentDirectory());
 
-        /// <summary>
-        /// Setup all of the SDL resources needed to display a window and draw text.
-        /// </summary>
-        public void Setup() {
-            // Initilizes SDL
-            if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0 || SDL_ttf.TTF_Init() < 0) {
-                Console.WriteLine($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
-            }
+        while (active) {
+            SDL.SDL_SetRenderDrawColor(rend, 64, 64, 64, 255);
+            SDL.SDL_RenderClear(rend);
 
-            // Create a new window given a title, size, and passes it a flag indicating it should be shown.
-            window = SDL.SDL_CreateWindow("World Customizer", SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED);
+            browser.Render(wnd, rend);
 
-            if (window == IntPtr.Zero) {
-                Console.WriteLine($"There was an issue creating the window. {SDL.SDL_GetError()}");
-            }
+            SDL.SDL_RenderPresent(rend);
 
-            // Creates a new SDL hardware renderer using the default graphics device with VSYNC enabled.
-            renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
-
-            if (renderer == IntPtr.Zero) {
-                Console.WriteLine($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
-            }
-
-            // Load fonts
-            Utils.currentFont = SDL_ttf.TTF_OpenFont("ComicMono.ttf", 24);
-            if (Utils.currentFont == IntPtr.Zero) {
-                Console.WriteLine("There was an error reading ComicMono");
-            }
-
-            SDL.SDL_GetWindowSize(window, out int w, out int h);
-            mainWindow = new Window(new Vector2(0, 0), new Vector2(w, h), this);
-            OptionBar optionBar = new OptionBar(new Vector2(w, 32), mainWindow);
-            mainWindow.AddChild(optionBar);
-            optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
-                new Tuple<string, Action<Button>>("File", optionBar.OpenFileContextMenu),
-                new Tuple<string, Action<Button>>("Preferences", new Action<Button>(optionBar.OpenPreferencesContextMenu))
-                }, optionBar, new Vector2(0, 0), 14, 5, 8));
-        }
-
-        /// <summary>
-        /// Checks to see if there are any events to be processed.
-        /// </summary>
-        public void PollEvents() {
-            // Check to see if there are any events and continue to do son until the queue is empty.
             while (SDL.SDL_PollEvent(out SDL.SDL_Event e) == 1) {
+                Console.WriteLine(e.window.windowEvent);
                 switch (e.type) {
-                    case SDL.SDL_EventType.SDL_QUIT:
-                        running = false;
-                        break;
-                    case SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN:
-                        clicked = true;
-                        mouseDown = true;
-                        break;
-                    case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:
-                        mouseDown = false;
+                    case SDL.SDL_EventType.SDL_WINDOWEVENT:
+                        if (e.window.windowID == SDL.SDL_GetWindowID(wnd) && e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_CLOSE) {
+                            active = false;
+                        }
                         break;
                 }
             }
+
+            browser.Update();
         }
 
-        /// <summary>
-        /// Renders to the window.
-        /// </summary>
-        public void Render() {
-            // Sets the color that the screen will be cleared with
-            SDL.SDL_SetRenderDrawColor(renderer, 8, 38, 82, 255);
+        SDL.SDL_DestroyWindow(wnd);
+        SDL.SDL_DestroyRenderer(rend);
 
-            // Clears the current render surface
-            SDL.SDL_RenderClear(renderer);
+        return;
+    }
+    public void Update() {
+        mainWindow.Update();
+    }
 
-            // Draw stuff here
-            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-            mainWindow.Render(window, renderer);
-
-            // Switches out the currently presented render surface with the one we just did work on
-            SDL.SDL_RenderPresent(renderer);
+    /// <summary>
+    /// Setup all of the SDL resources needed to display a window and draw text.
+    /// </summary>
+    public void Setup() {
+        // Initilizes SDL
+        if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
+            Console.WriteLine($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
         }
 
-        /// <summary>
-        /// Clean up the resources that were created
-        /// </summary>
-        public void CleanUp() {
-            SDL_ttf.TTF_CloseFont(Utils.currentFont);
-            SDL.SDL_DestroyRenderer(renderer);
-            SDL.SDL_DestroyWindow(window);
-            SDL.SDL_Quit();
+        // Create a new window given a title, size, and passes it a flag indicating it should be shown.
+        window = SDL.SDL_CreateWindow("World Customizer", SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED);
+
+        if (window == IntPtr.Zero) {
+            Console.WriteLine($"There was an issue creating the window. {SDL.SDL_GetError()}");
         }
 
+        // Creates a new SDL hardware renderer using the default graphics device with VSYNC enabled.
+        renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+
+        if (renderer == IntPtr.Zero) {
+            Console.WriteLine($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
+        }
+
+        // Load fonts
+        Utils.currentFont = SDL_ttf.TTF_OpenFont("ComicMono.ttf", 24);
+        if (Utils.currentFont == IntPtr.Zero) {
+            Console.WriteLine("There was an error reading ComicMono");
+        }
+
+        SDL.SDL_GetWindowSize(window, out int w, out int h);
+        mainWindow = new Window(new Vector2(0, 0), new Vector2(w, h), this);
+        OptionBar optionBar = new OptionBar(new Vector2(w, 32), mainWindow);
+        mainWindow.AddChild(optionBar);
+        optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
+            new Tuple<string, Action<Button>>("File", optionBar.OpenFileContextMenu),
+            new Tuple<string, Action<Button>>("Preferences", new Action<Button>(optionBar.OpenPreferencesContextMenu))
+            }, optionBar, new Vector2(0, 0), 14, 5, 8));
+    }
+
+    /// <summary>
+    /// Checks to see if there are any events to be processed.
+    /// </summary>
+    public void PollEvents() {
+        // Check to see if there are any events and continue to do son until the queue is empty.
+        while (SDL.SDL_PollEvent(out SDL.SDL_Event e) == 1) {
+            switch (e.type) {
+                case SDL.SDL_EventType.SDL_QUIT:
+                    running = false;
+                    break;
+                case SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN:
+                    clicked = true;
+                    mouseDown = true;
+                    break;
+                case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:
+                    mouseDown = false;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Renders to the window.
+    /// </summary>
+    public void Render() {
+        // Sets the color that the screen will be cleared with
+        SDL.SDL_SetRenderDrawColor(renderer, 8, 38, 82, 255);
+
+        // Clears the current render surface
+        SDL.SDL_RenderClear(renderer);
+
+        // Draw stuff here
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        mainWindow.Render(window, renderer);
+
+        // Switches out the currently presented render surface with the one we just did work on
+        SDL.SDL_RenderPresent(renderer);
+    }
+
+    /// <summary>
+    /// Clean up the resources that were created
+    /// </summary>
+    public void CleanUp() {
+        SDL_ttf.TTF_CloseFont(Utils.currentFont);
+        SDL_image.IMG_Quit();
+        SDL.SDL_DestroyRenderer(renderer);
+        SDL.SDL_DestroyWindow(window);
+        SDL.SDL_Quit();
     }
 }

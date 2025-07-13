@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using SDL2;
+using System.Threading;
 
 namespace WorldCustomizer;
 #nullable enable
@@ -85,6 +85,7 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
 }
 /// <summary>
 /// A small menu that pops up when clicking or right-clicking on a parent to provide options what to do.
+/// </summary>
 class ContextMenu : GenericUIElement, IRenderable, IAmInteractable {
     List<Button>? options;
     internal bool focused;
@@ -188,7 +189,7 @@ class ColorSelector : Draggable {
         ];
     }
     public void ApplyColorToParentWindow(Button _) {
-        parent.backgroundColor = Color.FromArgb(255, (int)rSlider.value, (int)gSlider.value, (int)bSlider.value);
+        parent.backgroundColor = new SDL.SDL_Color(){r=(byte)rSlider.value, g=(byte)gSlider.value, b=(byte)bSlider.value, a=255};
     }
     public void Close(Button _) {
         parent.RemoveChild(this);
@@ -405,15 +406,15 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
 class Window : GenericUIElement, IRenderable, IAmInteractable {
     internal readonly List<IRenderable> renderables;
     internal readonly List<IAmInteractable> updatables;
-    internal Color backgroundColor;
+    internal SDL.SDL_Color backgroundColor;
     internal Program parentProgram;
     internal Window(Vector2 position, Vector2 size, Program parentProgram) : base(position, size, null) {
         this.parentProgram = parentProgram;
         this.renderables = new List<IRenderable>();
         this.updatables = new List<IAmInteractable>();
-        this.backgroundColor = Color.FromArgb(255, 8, 38, 82);
+        this.backgroundColor = new SDL.SDL_Color(){r=8, g=38, b=82, a=255};
     }
-    public void AddChild(object child) {
+    public void AddChild(GenericUIElement child) {
         if (child is IRenderable renderable) {
             renderables.Add(renderable);
         }
@@ -421,7 +422,7 @@ class Window : GenericUIElement, IRenderable, IAmInteractable {
             updatables.Add(interactable);
         }
     }
-    public void RemoveChild(object child) {
+    public void RemoveChild(GenericUIElement child) {
         if (child is IRenderable renderable) {
             renderables.Remove(renderable);
         }
@@ -430,7 +431,7 @@ class Window : GenericUIElement, IRenderable, IAmInteractable {
         }
     }
     public void Render(IntPtr window, IntPtr renderer) {
-        SDL.SDL_SetRenderDrawColor(renderer, backgroundColor.R, backgroundColor.G, backgroundColor.B, backgroundColor.A);
+        SDL.SDL_SetRenderDrawColor(renderer, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
         var r = new SDL.SDL_FRect(){x=0, y=0, w=size.X, h=size.Y};
         SDL.SDL_RenderFillRectF(renderer, ref r);
 

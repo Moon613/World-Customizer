@@ -7,7 +7,7 @@ namespace WorldCustomizer;
 
 internal abstract class GenericUIElement {
     internal Vector2 _position;
-    internal Vector2 Position { get { return _position + parent._position; } set { _position = value; } }
+    internal Vector2 Position { get { return _position + (parent != null ? parent._position : Vector2.Zero); } set { _position = value; } }
     internal Vector2 size;
     internal GenericUIElement? parent;
     internal GenericUIElement(Vector2 position, Vector2 size, GenericUIElement? parent) {
