@@ -2,12 +2,14 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using SDL2;
 
 namespace WorldCustomizer;
 #nullable enable
 
 public static class Utils {
+    private static readonly Mutex writeTextMut = new Mutex();
     public static IntPtr currentFont;
     public static float LerpMap(float lowerRealVal, float upperRealVal, float lowerInverseLerpVal, float upperInverseLerpVal, float x) {
         float newX = InverseLerp(x, lowerInverseLerpVal, upperInverseLerpVal);
@@ -29,7 +31,7 @@ public static class Utils {
     /// Draws text to the screen, given a string and font, and has optional parameters for position, size, and text foreground color.<br />
     /// If Color is left null, the text will be white.
     /// </summary>
-    internal static void WriteText(IntPtr renderer, IntPtr window, string text, IntPtr font, int x = 0, int y = 0, int ptsize = 24, Color? color = null, int w = 0, int h = 0) {
+    internal static void WriteText(IntPtr renderer, IntPtr window, string text, IntPtr font, float x = 0, float y = 0, int ptsize = 24, Color? color = null, float w = 0, float h = 0) {
         if (font == IntPtr.Zero) {
             return;
         }
@@ -64,12 +66,12 @@ public static class Utils {
 
         // as TTF_RenderText_Solid could only be used on
         // SDL_Surface then you have to create the surface first
-        IntPtr surfaceMessage = SDL_ttf.TTF_RenderUTF8_Solid_Wrapped(currentFont, text, convertedColor, 0); 
+        IntPtr surfaceMessage = SDL_ttf.TTF_RenderUTF8_Solid_Wrapped(currentFont, text, convertedColor, 0);
 
         // now you can convert it into a texture
         IntPtr Message = SDL.SDL_CreateTextureFromSurface(renderer, surfaceMessage);
 
-        SDL.SDL_Rect Message_rect = new SDL.SDL_Rect() {x = x, y = y, w = w, h = h}; //create a rect
+        SDL.SDL_FRect Message_rect = new SDL.SDL_FRect() {x = x, y = y, w = w, h = h}; //create a rect
 
         // (0,0) is on the top left of the window/screen,
         // think a rect as the text's box,
@@ -82,7 +84,7 @@ public static class Utils {
         // the crop size (you can ignore this if you don't want
         // to dabble with cropping), and the rect which is the size
         // and coordinate of your texture
-        SDL.SDL_RenderCopy(renderer, Message, (IntPtr)null, ref Message_rect);
+        SDL.SDL_RenderCopyF(renderer, Message, (IntPtr)null, ref Message_rect);
 
         // Don't forget to free your surface and texture
         SDL.SDL_FreeSurface(surfaceMessage);

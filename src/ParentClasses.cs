@@ -23,7 +23,7 @@ internal abstract class GenericUIElement {
             return parent.GetTopLevelParent();
         }
     }
-    internal abstract Window GetParentWindow();
+    internal abstract WindowRenderCombo GetParentWindow();
 }
 internal abstract class Draggable : GenericUIElement, IRenderable, IAmInteractable {
     internal Vector2? mouseOffset;
@@ -31,7 +31,7 @@ internal abstract class Draggable : GenericUIElement, IRenderable, IAmInteractab
     internal Draggable(Vector2 position, Vector2 size, GenericUIElement parent) : base (position, size, parent) {
         mouseOffset = null;
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {

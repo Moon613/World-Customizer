@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using SDL2;
 using System.Threading;
+using System.IO;
 
 namespace WorldCustomizer;
 #nullable enable
@@ -14,15 +15,15 @@ namespace WorldCustomizer;
 internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
     List<Button>? options;
     ContextMenu? contextMenu;
-    new Window parent;
-    internal OptionBar(Vector2 size, Window parent) : base(Vector2.Zero, size, parent) {
+    new WindowRenderCombo parent;
+    internal OptionBar(Vector2 size, WindowRenderCombo parent) : base(Vector2.Zero, size, parent) {
         this.parent = parent;
         contextMenu = null;
     }
     internal void AssignButtons(List<Button> buttons) {
         options = buttons;
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
     }
     public void Render(IntPtr window, IntPtr renderer) {        
@@ -62,10 +63,13 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
             new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save button");})),
             new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save As button");})),
             new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Console.WriteLine("Clicked on the New button");})),
-            new Tuple<string, Action<Button>>("Load", new Action<Button>(_ => {Console.WriteLine("Clicked on the Load button");}))
+            new Tuple<string, Action<Button>>("Load", LoadFile)
         }, contextMenu, new Vector2(0, 0), 14, 5, 2);
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
         #pragma warning restore CS8604, IDE0090, IDE0028
+    }
+    public void LoadFile(Button _) {
+        GetParentWindow().parentProgram.OpenFileBrowser();
     }
     public void OpenPreferencesContextMenu(Button _) {
         Console.WriteLine("Clicked on the Preferences Tab");
@@ -138,7 +142,7 @@ class ContextMenu : GenericUIElement, IRenderable, IAmInteractable {
             interactable.Signal(text);
         }
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
     }
 }
@@ -148,9 +152,9 @@ class ColorSelector : Draggable {
     readonly Button closeButton;
     readonly List<SDL.SDL_Vertex> verticies;
     readonly ColorBox colorBox;
-    new internal Window parent;
+    new internal WindowRenderCombo parent;
     const int RAD = 60;
-    internal ColorSelector(Vector2 position, Vector2 size, Window parent) : base (position, size, parent) {
+    internal ColorSelector(Vector2 position, Vector2 size, WindowRenderCombo parent) : base (position, size, parent) {
         this.parent = parent;
         rSlider = new Slider(new Vector2(20, 270), new Vector2(73, 20), this, 0, 255, true);
         gSlider = new Slider(new Vector2(113, 270), new Vector2(73, 20), this, 0, 255, true);
@@ -307,7 +311,7 @@ class Slider : GenericUIElement, IRenderable, IAmInteractable {
             }
         }
     }
-    internal override Window GetParentWindow(){
+    internal override WindowRenderCombo GetParentWindow(){
         return parent.GetParentWindow();
     }
 }
@@ -324,17 +328,17 @@ class ColorBox : GenericUIElement, IRenderable {
         SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL.SDL_RenderDrawRectF(renderer, ref rect);
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
     }
 }
 class Button : GenericUIElement, IRenderable, IAmInteractable {
     internal event Action<Button> Clicked;
     internal string text;
-    Vector2 textOffset;
+    internal Vector2 textOffset;
     readonly int ptsize;
     readonly bool hasBorder;
-    internal Button(string text, GenericUIElement parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) : base(position, Vector2.Zero, parent) {
+    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) : base(position, Vector2.Zero, parent) {
         this.text = text;
         this.size = new Vector2(width + 2*(int)textOffset.X, height + 2*(int)textOffset.Y);
         this.ptsize = ptsize;
@@ -342,7 +346,7 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
         this.hasBorder = hasBorder;
         this.Clicked += action;
     }
-    public void Render(IntPtr window, IntPtr renderer) {
+    public virtual void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         var r = new SDL.SDL_FRect() {x = Position.X, y = Position.Y, w = size.X, h = size.Y};
         
@@ -398,17 +402,63 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
 
         return buttonList;
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
     }
 }
 
-class Window : GenericUIElement, IRenderable, IAmInteractable {
+class ButtonWithImage : Button {
+    readonly string image;
+    Vector2 imageSize;
+    readonly float imageXOffset;
+    internal ButtonWithImage(string text, string image, Vector2 imageSize, float imageXOffset, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) : base(text, parent, position, width, height, ptsize, textOffset + new Vector2(imageSize.X, 0), hasBorder, action) {
+        this.image = image;
+        this.imageSize = imageSize;
+        this.imageXOffset = imageXOffset;
+    }
+    public override void Render(IntPtr window, IntPtr renderer) {
+        base.Render(window, renderer);
+        IntPtr texture = SDL_image.IMG_LoadTexture(renderer, "E:/World-Customizer/Build/textures" + Path.DirectorySeparatorChar + image);
+        if (texture == IntPtr.Zero) {
+            Console.WriteLine("Could not load image");
+            Console.WriteLine(SDL.SDL_GetError());
+        }
+
+        var rect = new SDL.SDL_FRect(){x=Position.X+imageXOffset, y=Position.Y+textOffset.Y/2, w=imageSize.X, h=imageSize.Y};
+        if (SDL.SDL_RenderCopyF(renderer, texture, (IntPtr)null, ref rect) < 0) {
+            Console.WriteLine("Error Rendering Texture");
+            Console.WriteLine(SDL.SDL_GetError());
+        }
+
+        SDL.SDL_DestroyTexture(texture);
+    }
+}
+
+class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal readonly List<IRenderable> renderables;
     internal readonly List<IAmInteractable> updatables;
     internal SDL.SDL_Color backgroundColor;
     internal Program parentProgram;
-    internal Window(Vector2 position, Vector2 size, Program parentProgram) : base(position, size, null) {
+    internal IntPtr window;
+    internal IntPtr renderer;
+    internal WindowRenderCombo(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, null) {
+        // Create a new window given a title, size, and passes it a flag indicating it should be shown.
+        window = SDL.SDL_CreateWindow(title, SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, (int)size.X, (int)size.Y, windowFlags);
+        if (window == IntPtr.Zero) {
+            Console.WriteLine($"There was an issue creating the window. {SDL.SDL_GetError()}");
+        }
+
+        // Creates a new SDL hardware renderer using the default graphics device with VSYNC enabled.
+        renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+        if (renderer == IntPtr.Zero) {
+            Console.WriteLine($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
+        }
+
+        if (size == Vector2.Zero) {
+            SDL.SDL_GetWindowSize(window, out int w, out int h);
+            this.size = new Vector2(w, h);
+        }
+
         this.parentProgram = parentProgram;
         this.renderables = new List<IRenderable>();
         this.updatables = new List<IAmInteractable>();
@@ -430,12 +480,25 @@ class Window : GenericUIElement, IRenderable, IAmInteractable {
             updatables.Remove(interactable);
         }
     }
-    public void Render(IntPtr window, IntPtr renderer) {
+    public void Close() {
+        parentProgram.windows.Remove(this);
+        SDL.SDL_DestroyRenderer(renderer);
+        SDL.SDL_DestroyWindow(window);
+    }
+    public void Render() {
+        // Sets the color that the screen will be cleared with
         SDL.SDL_SetRenderDrawColor(renderer, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
-        var r = new SDL.SDL_FRect(){x=0, y=0, w=size.X, h=size.Y};
-        SDL.SDL_RenderFillRectF(renderer, ref r);
 
-        SDL.SDL_SetRenderDrawColor(renderer, 128, 128, 128, 1);
+        // Clears the current render surface
+        SDL.SDL_RenderClear(renderer);
+
+        Render(window, renderer);
+
+        // Switches out the currently presented render surface with the one we just did work on
+        SDL.SDL_RenderPresent(renderer);
+    }
+    public virtual void Render(IntPtr window, IntPtr renderer) {
+        SDL.SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
         for (int i = 25; i < size.X; i+=50) {
             SDL.SDL_RenderDrawLineF(renderer, i, 0, i, size.Y);
         }
@@ -452,7 +515,7 @@ class Window : GenericUIElement, IRenderable, IAmInteractable {
     }
     public void Signal(string text) {
     }
-    public void Update() {
+    public virtual void Update() {
         try {
             for (int i = 0; i < updatables.Count; i++) {
                 updatables[i].Update();
@@ -461,7 +524,7 @@ class Window : GenericUIElement, IRenderable, IAmInteractable {
             Console.WriteLine(err);
         }
     }
-    internal override Window GetParentWindow() {
+    internal override WindowRenderCombo GetParentWindow() {
         return this;
     }
 }

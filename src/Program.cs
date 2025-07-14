@@ -1,6 +1,6 @@
 using System;
-using System.Drawing;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using SDL2;
 
@@ -17,64 +17,32 @@ class Entry {
         Program main = new();
         main.Setup();
 
+        try {
         while (main.running) {
             main.PollEvents();
             main.Update();
             main.Render();
             main.clicked = false;
         }
+        } catch (Exception err) {
+            if (!File.Exists(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt")) {
+                File.Create(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt");
+            }
+            File.WriteAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt", err.ToString());
+        }
 
         main.CleanUp();
     }
 }
 internal class Program {
-    private IntPtr window;
-    private IntPtr renderer;
     public bool running = true;
     internal bool mouseDown = false;
     internal bool clicked = false;
     internal string? folderToLoadFrom = null;
 
     #pragma warning disable CS8618
-    internal Window mainWindow;
+    internal List<WindowRenderCombo> windows;
     #pragma warning restore CS8618
-
-    public void OpenFileBrowser() {
-        bool active = true;
-        IntPtr wnd = SDL.SDL_CreateWindow("File Browser", SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, 640, 360, SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS /*| SDL.SDL_WindowFlags.SDL_WINDOW_BORDERLESS*/);
-        IntPtr rend = SDL.SDL_CreateRenderer(wnd, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-        FileBrowser browser = new FileBrowser(Directory.GetCurrentDirectory());
-
-        while (active) {
-            SDL.SDL_SetRenderDrawColor(rend, 64, 64, 64, 255);
-            SDL.SDL_RenderClear(rend);
-
-            browser.Render(wnd, rend);
-
-            SDL.SDL_RenderPresent(rend);
-
-            while (SDL.SDL_PollEvent(out SDL.SDL_Event e) == 1) {
-                Console.WriteLine(e.window.windowEvent);
-                switch (e.type) {
-                    case SDL.SDL_EventType.SDL_WINDOWEVENT:
-                        if (e.window.windowID == SDL.SDL_GetWindowID(wnd) && e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_CLOSE) {
-                            active = false;
-                        }
-                        break;
-                }
-            }
-
-            browser.Update();
-        }
-
-        SDL.SDL_DestroyWindow(wnd);
-        SDL.SDL_DestroyRenderer(rend);
-
-        return;
-    }
-    public void Update() {
-        mainWindow.Update();
-    }
 
     /// <summary>
     /// Setup all of the SDL resources needed to display a window and draw text.
@@ -85,29 +53,16 @@ internal class Program {
             Console.WriteLine($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
         }
 
-        // Create a new window given a title, size, and passes it a flag indicating it should be shown.
-        window = SDL.SDL_CreateWindow("World Customizer", SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, 640, 480, SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED);
-
-        if (window == IntPtr.Zero) {
-            Console.WriteLine($"There was an issue creating the window. {SDL.SDL_GetError()}");
-        }
-
-        // Creates a new SDL hardware renderer using the default graphics device with VSYNC enabled.
-        renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
-
-        if (renderer == IntPtr.Zero) {
-            Console.WriteLine($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
-        }
-
         // Load fonts
         Utils.currentFont = SDL_ttf.TTF_OpenFont("ComicMono.ttf", 24);
         if (Utils.currentFont == IntPtr.Zero) {
             Console.WriteLine("There was an error reading ComicMono");
         }
 
-        SDL.SDL_GetWindowSize(window, out int w, out int h);
-        mainWindow = new Window(new Vector2(0, 0), new Vector2(w, h), this);
-        OptionBar optionBar = new OptionBar(new Vector2(w, 32), mainWindow);
+        windows = new List<WindowRenderCombo>();
+        WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED);
+        windows.Add(mainWindow);
+        OptionBar optionBar = new OptionBar(new Vector2(mainWindow.size.X, 32), mainWindow);
         mainWindow.AddChild(optionBar);
         optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
             new Tuple<string, Action<Button>>("File", optionBar.OpenFileContextMenu),
@@ -132,36 +87,45 @@ internal class Program {
                 case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:
                     mouseDown = false;
                     break;
+                case SDL.SDL_EventType.SDL_WINDOWEVENT:
+                    if (e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_CLOSE) {
+                        for (int i = 0; i < windows.Count; i++) {
+                            if (SDL.SDL_GetWindowID(windows[i].window) == e.window.windowID) {
+                                windows[i].Close();
+                            }
+                        }
+                    }
+                    break;
             }
         }
     }
-
+    public void OpenFileBrowser() {
+        windows.Add(new FileBrowser(Vector2.Zero, FileBrowser.FileBrowserSize, this, "File Browser", SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS, Directory.GetCurrentDirectory()));
+    }
+    public void Update() {
+        for (int i = 0; i < windows.Count; i++) {
+            windows[i].Update();
+        }
+    }
     /// <summary>
     /// Renders to the window.
     /// </summary>
     public void Render() {
-        // Sets the color that the screen will be cleared with
-        SDL.SDL_SetRenderDrawColor(renderer, 8, 38, 82, 255);
-
-        // Clears the current render surface
-        SDL.SDL_RenderClear(renderer);
-
-        // Draw stuff here
-        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        mainWindow.Render(window, renderer);
-
-        // Switches out the currently presented render surface with the one we just did work on
-        SDL.SDL_RenderPresent(renderer);
+        for (int i = 0; i < windows.Count; i++) {
+            windows[i].Render();
+        }
     }
 
     /// <summary>
     /// Clean up the resources that were created
     /// </summary>
     public void CleanUp() {
+        foreach (WindowRenderCombo window in windows) {
+            SDL.SDL_DestroyRenderer(window.renderer);
+            SDL.SDL_DestroyWindow(window.window);
+        }
         SDL_ttf.TTF_CloseFont(Utils.currentFont);
         SDL_image.IMG_Quit();
-        SDL.SDL_DestroyRenderer(renderer);
-        SDL.SDL_DestroyWindow(window);
         SDL.SDL_Quit();
     }
 }
