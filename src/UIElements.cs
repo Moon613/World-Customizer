@@ -338,19 +338,21 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
     internal Vector2 textOffset;
     readonly int ptsize;
     readonly bool hasBorder;
-    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) : base(position, Vector2.Zero, parent) {
+    SDL.SDL_Color color;
+    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null) : base(position, Vector2.Zero, parent) {
         this.text = text;
         this.size = new Vector2(width + 2*(int)textOffset.X, height + 2*(int)textOffset.Y);
         this.ptsize = ptsize;
         this.textOffset = textOffset;
         this.hasBorder = hasBorder;
         this.Clicked += action;
+        this.color = (SDL.SDL_Color)((color==null) ? new SDL.SDL_Color(){r=255, g=255, b=255, a=255} : color);
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         var r = new SDL.SDL_FRect() {x = Position.X, y = Position.Y, w = size.X, h = size.Y};
         
-        if (mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+        if (GetParentWindow().IsFocused && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
             SDL.SDL_RenderFillRectF(renderer, ref r);
         }
@@ -358,11 +360,11 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref r);
         }
-        Utils.WriteText(renderer, window, text, Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize);
+        Utils.WriteText(renderer, window, text, Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize, color);
     }
     public void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+        if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             Clicked.Invoke(this);
         }
     }
@@ -411,7 +413,7 @@ class ButtonWithImage : Button {
     readonly string image;
     Vector2 imageSize;
     readonly float imageXOffset;
-    internal ButtonWithImage(string text, string image, Vector2 imageSize, float imageXOffset, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action) : base(text, parent, position, width, height, ptsize, textOffset + new Vector2(imageSize.X, 0), hasBorder, action) {
+    internal ButtonWithImage(string text, string image, Vector2 imageSize, float imageXOffset, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null) : base(text, parent, position, width, height, ptsize, textOffset + new Vector2(imageSize.X, 0), hasBorder, action, color) {
         this.image = image;
         this.imageSize = imageSize;
         this.imageXOffset = imageXOffset;
@@ -441,6 +443,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal Program parentProgram;
     internal IntPtr window;
     internal IntPtr renderer;
+    internal bool IsFocused => ((SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS) | (SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS)) == ((int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
     internal WindowRenderCombo(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, null) {
         // Create a new window given a title, size, and passes it a flag indicating it should be shown.
         window = SDL.SDL_CreateWindow(title, SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, (int)size.X, (int)size.Y, windowFlags);

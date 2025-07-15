@@ -22,13 +22,12 @@ class Entry {
             main.PollEvents();
             main.Update();
             main.Render();
+            // Reset variable for the next loop
             main.clicked = false;
+            main.scrollY = 0;
         }
         } catch (Exception err) {
-            if (!File.Exists(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt")) {
-                File.Create(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt");
-            }
-            File.WriteAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt", err.ToString());
+            Utils.DebugLog(err);
         }
 
         main.CleanUp();
@@ -38,6 +37,7 @@ internal class Program {
     public bool running = true;
     internal bool mouseDown = false;
     internal bool clicked = false;
+    internal float scrollY;
     internal string? folderToLoadFrom = null;
 
     #pragma warning disable CS8618
@@ -65,7 +65,7 @@ internal class Program {
         }
 
         windows = new List<WindowRenderCombo>();
-        WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED);
+        WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
         windows.Add(mainWindow);
         OptionBar optionBar = new OptionBar(new Vector2(mainWindow.size.X, 32), mainWindow);
         mainWindow.AddChild(optionBar);
@@ -101,11 +101,14 @@ internal class Program {
                         }
                     }
                     break;
+                case SDL.SDL_EventType.SDL_MOUSEWHEEL:
+                    scrollY = e.wheel.preciseY;
+                    break;
             }
         }
     }
     public void OpenFileBrowser() {
-        windows.Add(new FileBrowser(Vector2.Zero, FileBrowser.FileBrowserSize, this, "File Browser", SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS, Directory.GetCurrentDirectory()));
+        windows.Add(new FileBrowser(Vector2.Zero, FileBrowser.FileBrowserSize, this, "File Browser", SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_BORDERLESS, Directory.GetCurrentDirectory()));
     }
     public void Update() {
         for (int i = 0; i < windows.Count; i++) {
