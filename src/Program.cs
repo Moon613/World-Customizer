@@ -48,6 +48,11 @@ internal class Program {
     /// Setup all of the SDL resources needed to display a window and draw text.
     /// </summary>
     public void Setup() {
+        if (File.Exists(Utils.DebugLogPath) && File.ReadAllText(Utils.DebugLogPath) != "") {
+            File.WriteAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog_1.txt", File.ReadAllText(Utils.DebugLogPath));
+            File.WriteAllText(Utils.DebugLogPath, "");
+        }
+
         // Initilizes SDL
         if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
             Utils.DebugLog($"There was an issue initializing SDL. {SDL.SDL_GetError()}");

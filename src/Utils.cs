@@ -39,7 +39,7 @@ public static class Utils {
     /// Draws text to the screen, given a string and font, and has optional parameters for position, size, and text foreground color.<br />
     /// If Color is left null, the text will be white.
     /// </summary>
-    internal static void WriteText(IntPtr renderer, IntPtr window, string text, IntPtr font, float x = 0, float y = 0, int ptsize = 24, Color? color = null, float w = 0, float h = 0) {
+    internal static void WriteText(IntPtr renderer, IntPtr window, string text, IntPtr font, float x = 0, float y = 0, int ptsize = 24, SDL.SDL_Color? color = null, float w = 0, float h = 0) {
         if (font == IntPtr.Zero) {
             return;
         }
@@ -66,10 +66,10 @@ public static class Utils {
             convertedColor.a = 255;
         }
         else {
-            convertedColor.r = color.Value.R;
-            convertedColor.g = color.Value.G;
-            convertedColor.b = color.Value.B;
-            convertedColor.a = color.Value.A;
+            convertedColor.r = color.Value.r;
+            convertedColor.g = color.Value.g;
+            convertedColor.b = color.Value.b;
+            convertedColor.a = color.Value.a;
         }
 
         // as TTF_RenderText_Solid could only be used on
