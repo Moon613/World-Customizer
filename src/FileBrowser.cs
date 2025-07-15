@@ -36,7 +36,7 @@ class FileBrowser : WindowRenderCombo {
         DriveInfo.GetDrives().Where(x => x.IsReady).ToList().ForEach(info => directoryButtons.Add(new Button(info.RootDirectory.Name, this, new Vector2(55, 200 + 30*directoryButtons.Count), 20, 15, 16, new Vector2(10, 5), true, ChangeDrive)));
         quitButton = new ButtonWithImage("Quit", "quit.png", new Vector2(20, 20), 5, this, new Vector2(35, 140), 20, 15, 16, new Vector2(10, 5), true, Quit);
         selectButton = new ButtonWithImage("Select", "file.png", new Vector2(20, 20), 5, this, new Vector2(30, 100), 30, 15, 16, new Vector2(10, 5), true, Select);
-        enterDirButton = new ButtonWithImage("Down", "folder.png", new Vector2(20, 20), 5, this, new Vector2(35, 60), 30, 15, 16, new Vector2(10, 5), true, EnterDirectory);
+        enterDirButton = new ButtonWithImage("Down", "folder.png", new Vector2(20, 20), 5, this, new Vector2(35, 60), 20, 15, 16, new Vector2(10, 5), true, EnterDirectory);
         upDirButton = new ButtonWithImage("Up", "up_dir.png", new Vector2(20, 20), 5, this, new Vector2(45, 20), -5, 15, 16, new Vector2(10, 5), true, UpDirectory);
     }
     private void ChangeParentDirectory(string newDirectory) {
@@ -53,7 +53,6 @@ class FileBrowser : WindowRenderCombo {
         if (currentParentDir != Directory.GetDirectoryRoot(currentParentDir)) {
             ChangeParentDirectory(Directory.GetParent(currentParentDir).FullName);
         }
-        Utils.DebugLog(Directory.GetDirectoryRoot(currentParentDir));
     }
     public void EnterDirectory(Button _) {
         if (selected?.type == Type.Folder) {
@@ -61,7 +60,11 @@ class FileBrowser : WindowRenderCombo {
         }
     }
     public void Select(Button _) {
-        // parentProgram.folderToLoadFrom
+        if (selected != null) {
+            parentProgram.folderToLoadFrom = currentParentDir + Path.DirectorySeparatorChar + selected.text;
+        }
+        Utils.DebugLog(parentProgram.folderToLoadFrom);
+        Close();
     }
     public void Quit(Button _) {
         Close();
@@ -130,6 +133,26 @@ class FileBrowser : WindowRenderCombo {
         foreach (Button button in directoryButtons) {
             button.Update();
         }
+
+        if (selected == null || selected?.type != Type.Folder) {
+            enterDirButton.greyedOut = true;
+        }
+        else {
+            enterDirButton.greyedOut = false;
+        }
+        if (selected == null) {
+            selectButton.greyedOut = true;
+        }
+        else {
+            selectButton.greyedOut = false;
+        }
+        if (currentParentDir == Directory.GetDirectoryRoot(currentParentDir)) {
+            upDirButton.greyedOut = true;
+        }
+        else {
+            upDirButton.greyedOut = false;
+        }
+
         quitButton.Update();
         selectButton.Update();
         enterDirButton.Update();
@@ -150,6 +173,7 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
         this.ptsize = ptsize;
     }
     public void Render(IntPtr window, IntPtr renderer) {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         // Prevent lag by not rendering if it won't be seen anyway.
         if (Position.Y > parent.size.Y || Position.Y < -size.Y) {
             return;
@@ -158,6 +182,11 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
         if (selected) {
             var r = new SDL.SDL_FRect(){x=Position.X, y=Position.Y, w=size.X, h=size.Y};
             SDL.SDL_SetRenderDrawColor(renderer, 39, 150, 214, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref r);
+        }
+        else if (GetParentWindow().IsFocused && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+            var r = new SDL.SDL_FRect(){x=Position.X, y=Position.Y, w=size.X, h=size.Y};
+            SDL.SDL_SetRenderDrawColor(renderer, 39, 150, 214, 150);
             SDL.SDL_RenderFillRectF(renderer, ref r);
         }
 
@@ -184,7 +213,7 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             selected = true;
-            if (((FileBrowser)GetParentWindow()).selected is FileBrowserCheckButton b) {
+            if (((FileBrowser)GetParentWindow()).selected is FileBrowserCheckButton b && b != this) {
                 b.selected = false;
             }
             ((FileBrowser)GetParentWindow()).selected = this;

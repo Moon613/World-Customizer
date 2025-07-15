@@ -208,6 +208,7 @@ class ColorSelector : Draggable {
         colorBox.color.r = (byte)rSlider.value;
         colorBox.color.g = (byte)gSlider.value;
         colorBox.color.b = (byte)bSlider.value;
+        colorBox.color.a = 255;
         colorBox.Render(window, renderer);
 
         SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -226,7 +227,7 @@ class ColorSelector : Draggable {
         // Change the color of the center of the hexagon to show white/black
         byte blackWhiteVal = (byte)(0.2f*rSlider.value + 0.7f*gSlider.value + 0.1f*bSlider.value);
         for (int i = 2; i < verticies.Count; i += 3) {
-            verticies[i] = verticies[i] with {color=new(){r=blackWhiteVal, g=blackWhiteVal, b=blackWhiteVal}};
+            verticies[i] = verticies[i] with {color=new(){r=blackWhiteVal, g=blackWhiteVal, b=blackWhiteVal, a=255}};
         }
 
         SDL.SDL_SetRenderDrawColor(renderer, (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), 255);
@@ -234,7 +235,6 @@ class ColorSelector : Draggable {
         
         SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL.SDL_RenderDrawRectF(renderer, ref r);
-
     }
     public override void Update() {
         base.Update();
@@ -339,7 +339,8 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
     readonly int ptsize;
     readonly bool hasBorder;
     SDL.SDL_Color color;
-    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null) : base(position, Vector2.Zero, parent) {
+    internal bool greyedOut;
+    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null, bool greyedOut = false) : base(position, Vector2.Zero, parent) {
         this.text = text;
         this.size = new Vector2(width + 2*(int)textOffset.X, height + 2*(int)textOffset.Y);
         this.ptsize = ptsize;
@@ -347,6 +348,7 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
         this.hasBorder = hasBorder;
         this.Clicked += action;
         this.color = (SDL.SDL_Color)((color==null) ? new SDL.SDL_Color(){r=255, g=255, b=255, a=255} : color);
+        this.greyedOut = greyedOut;
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
@@ -361,10 +363,14 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_RenderDrawRectF(renderer, ref r);
         }
         Utils.WriteText(renderer, window, text, Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize, color);
+        if (greyedOut) {
+            SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+            SDL.SDL_RenderFillRectF(renderer, ref r);
+        }
     }
     public void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+        if (!greyedOut && GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             Clicked.Invoke(this);
         }
     }
@@ -456,6 +462,8 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         if (renderer == IntPtr.Zero) {
             Utils.DebugLog($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
         }
+
+        SDL.SDL_SetRenderDrawBlendMode(renderer, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
 
         if (size == Vector2.Zero) {
             SDL.SDL_GetWindowSize(window, out int w, out int h);
