@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
@@ -9,8 +10,15 @@ namespace WorldCustomizer;
 #nullable enable
 
 public static class Utils {
-    private static readonly Mutex writeTextMut = new Mutex();
     public static IntPtr currentFont;
+    public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
+    public static void DebugLog(Exception err) {
+        DebugLog(err.ToString());
+    }
+    public static void DebugLog(string text) {
+        Console.WriteLine(text);
+        File.AppendAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt", text+"\n");
+    }
     public static float LerpMap(float lowerRealVal, float upperRealVal, float lowerInverseLerpVal, float upperInverseLerpVal, float x) {
         float newX = InverseLerp(x, lowerInverseLerpVal, upperInverseLerpVal);
         return Lerp(lowerRealVal, upperRealVal, newX);

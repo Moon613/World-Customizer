@@ -55,14 +55,14 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         }
     }
     public void OpenFileContextMenu(Button _) {
-        Console.WriteLine("Opened the File Context Menu");
+        Utils.DebugLog("Opened the File Context Menu");
         #pragma warning disable CS8604, IDE0090, IDE0028
         contextMenu = new ContextMenu(new Vector2(0, 32), this);
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
-            new Tuple<string, Action<Button>>("File", new Action<Button>(_ => {Console.WriteLine("Clicked the File button");})),
-            new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save button");})),
-            new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Console.WriteLine("Clicked on the Save As button");})),
-            new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Console.WriteLine("Clicked on the New button");})),
+            new Tuple<string, Action<Button>>("File", new Action<Button>(_ => {Utils.DebugLog("Clicked the File button");})),
+            new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save button");})),
+            new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save As button");})),
+            new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Utils.DebugLog("Clicked on the New button");})),
             new Tuple<string, Action<Button>>("Load", LoadFile)
         }, contextMenu, new Vector2(0, 0), 14, 5, 2);
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
@@ -72,7 +72,7 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         GetParentWindow().parentProgram.OpenFileBrowser();
     }
     public void OpenPreferencesContextMenu(Button _) {
-        Console.WriteLine("Clicked on the Preferences Tab");
+        Utils.DebugLog("Clicked on the Preferences Tab");
         contextMenu = new ContextMenu(new Vector2(42, 32), this);
 
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
@@ -82,7 +82,7 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
     }
     public void OpenBackgroundColorSelector(Button _) {
-        Console.WriteLine("Clicked the background color selector button");
+        Utils.DebugLog("Clicked the background color selector button");
         ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), new Vector2(300, 300), parent);
         parent.AddChild(colorSelector);
     }
@@ -420,14 +420,14 @@ class ButtonWithImage : Button {
         base.Render(window, renderer);
         IntPtr texture = SDL_image.IMG_LoadTexture(renderer, "E:/World-Customizer/Build/textures" + Path.DirectorySeparatorChar + image);
         if (texture == IntPtr.Zero) {
-            Console.WriteLine("Could not load image");
-            Console.WriteLine(SDL.SDL_GetError());
+            Utils.DebugLog("Could not load image");
+            Utils.DebugLog(SDL.SDL_GetError());
         }
 
         var rect = new SDL.SDL_FRect(){x=Position.X+imageXOffset, y=Position.Y+textOffset.Y/2, w=imageSize.X, h=imageSize.Y};
         if (SDL.SDL_RenderCopyF(renderer, texture, (IntPtr)null, ref rect) < 0) {
-            Console.WriteLine("Error Rendering Texture");
-            Console.WriteLine(SDL.SDL_GetError());
+            Utils.DebugLog("Error Rendering Texture");
+            Utils.DebugLog(SDL.SDL_GetError());
         }
 
         SDL.SDL_DestroyTexture(texture);
@@ -445,13 +445,13 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         // Create a new window given a title, size, and passes it a flag indicating it should be shown.
         window = SDL.SDL_CreateWindow(title, SDL.SDL_WINDOWPOS_UNDEFINED, SDL.SDL_WINDOWPOS_UNDEFINED, (int)size.X, (int)size.Y, windowFlags);
         if (window == IntPtr.Zero) {
-            Console.WriteLine($"There was an issue creating the window. {SDL.SDL_GetError()}");
+            Utils.DebugLog($"There was an issue creating the window. {SDL.SDL_GetError()}");
         }
 
         // Creates a new SDL hardware renderer using the default graphics device with VSYNC enabled.
         renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
         if (renderer == IntPtr.Zero) {
-            Console.WriteLine($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
+            Utils.DebugLog($"There was an issue creating the renderer. {SDL.SDL_GetError()}");
         }
 
         if (size == Vector2.Zero) {
@@ -481,6 +481,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         }
     }
     public void Close() {
+        Utils.DebugLog("Removed a window");
         parentProgram.windows.Remove(this);
         SDL.SDL_DestroyRenderer(renderer);
         SDL.SDL_DestroyWindow(window);
@@ -510,7 +511,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
                 renderables[i].Render(window, renderer);
             }
         } catch (Exception err) {
-            Console.WriteLine(err);
+            Utils.DebugLog(err);
         }
     }
     public void Signal(string text) {
@@ -521,7 +522,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
                 updatables[i].Update();
             }
         } catch (Exception err) {
-            Console.WriteLine(err);
+            Utils.DebugLog(err);
         }
     }
     internal override WindowRenderCombo GetParentWindow() {

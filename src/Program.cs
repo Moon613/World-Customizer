@@ -50,13 +50,13 @@ internal class Program {
     public void Setup() {
         // Initilizes SDL
         if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
-            Console.WriteLine($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
+            Utils.DebugLog($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
         }
 
         // Load fonts
         Utils.currentFont = SDL_ttf.TTF_OpenFont("ComicMono.ttf", 24);
         if (Utils.currentFont == IntPtr.Zero) {
-            Console.WriteLine("There was an error reading ComicMono");
+            Utils.DebugLog("There was an error reading ComicMono");
         }
 
         windows = new List<WindowRenderCombo>();
