@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using SDL2;
 
@@ -28,6 +29,7 @@ class Entry {
         }
         } catch (Exception err) {
             Utils.DebugLog(err);
+            Utils.DebugLog(SDL.SDL_GetError());
         }
 
         main.CleanUp();
@@ -39,6 +41,7 @@ internal class Program {
     internal bool clicked = false;
     internal float scrollY;
     internal string? folderToLoadFrom = null;
+    internal WorldData? currentWorld;
 
     #pragma warning disable CS8618
     internal List<WindowRenderCombo> windows;
@@ -67,6 +70,7 @@ internal class Program {
         windows = new List<WindowRenderCombo>();
         WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
         windows.Add(mainWindow);
+        mainWindow.AddChild(new WorldRenderer(Vector2.Zero, mainWindow.size, mainWindow));
         OptionBar optionBar = new OptionBar(new Vector2(mainWindow.size.X, 32), mainWindow);
         mainWindow.AddChild(optionBar);
         optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
@@ -114,6 +118,14 @@ internal class Program {
         for (int i = 0; i < windows.Count; i++) {
             windows[i].Update();
         }
+        if (folderToLoadFrom != null) {
+            currentWorld?.Destroy();
+            currentWorld = new WorldData(folderToLoadFrom, windows[0].renderer);
+            foreach (var room in currentWorld.roomData) {
+                Utils.DebugLog(room.ToString());
+            }
+            folderToLoadFrom = null;
+        }
     }
     /// <summary>
     /// Renders to the window.
@@ -132,6 +144,7 @@ internal class Program {
             SDL.SDL_DestroyRenderer(window.renderer);
             SDL.SDL_DestroyWindow(window.window);
         }
+        currentWorld?.Destroy();
         SDL_ttf.TTF_CloseFont(Utils.currentFont);
         SDL_image.IMG_Quit();
         SDL.SDL_Quit();

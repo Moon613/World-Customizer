@@ -12,6 +12,34 @@ namespace WorldCustomizer;
 public static class Utils {
     public static IntPtr currentFont;
     public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
+    public static float Magnitude(this Vector2 vector) {
+        return (float)Math.Sqrt(Math.Pow(vector.X, 2) + Math.Pow(vector.Y, 2));
+    }
+    public static void SetPixel(IntPtr surface, int x, int y, SDL.SDL_Color color) {
+        SetPixel(surface, x, y, color.r, color.g, color.b, color.a);
+    }
+    public static unsafe void SetPixel(IntPtr surface, int x, int y, byte r, byte g, byte b, byte a = 255) {
+        SDL.SDL_LockSurface(surface);
+
+        byte* pixelArray = (byte*)((SDL.SDL_Surface*)surface)->pixels;
+        byte bytesPerPixel = ((SDL.SDL_PixelFormat*)((SDL.SDL_Surface*)surface)->format)->BytesPerPixel;
+        int pitch = ((SDL.SDL_Surface*)surface)->pitch;
+        pixelArray[y*pitch + x*bytesPerPixel + 0] = r;
+        pixelArray[y*pitch + x*bytesPerPixel + 1] = g;
+        pixelArray[y*pitch + x*bytesPerPixel + 2] = b;
+        pixelArray[y*pitch + x*bytesPerPixel + 3] = a;
+
+        SDL.SDL_UnlockSurface(surface);
+    }
+    public static void DebugLog(float num) {
+        DebugLog(num.ToString());
+    }
+    public static void DebugLog(int num) {
+        DebugLog(num.ToString());
+    }
+    public static void DebugLog(byte num) {
+        DebugLog(num.ToString());
+    }
     public static void DebugLog(Exception err) {
         DebugLog(err.ToString());
     }
