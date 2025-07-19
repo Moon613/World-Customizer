@@ -190,7 +190,7 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_RenderFillRectF(renderer, ref r);
         }
 
-        IntPtr texture = SDL_image.IMG_LoadTexture(renderer, "E:/World-Customizer/Build/textures" + Path.DirectorySeparatorChar + image);
+        IntPtr texture = SDL_image.IMG_LoadTexture(renderer, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "textures" + Path.DirectorySeparatorChar + image);
         if (texture == IntPtr.Zero) {
             Utils.DebugLog("Could not load image");
             Utils.DebugLog(SDL.SDL_GetError());
