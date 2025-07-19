@@ -31,6 +31,9 @@ public static class Utils {
 
         SDL.SDL_UnlockSurface(surface);
     }
+    public static void DebugLog(Vector2 num) {
+        DebugLog(num.ToString());
+    }
     public static void DebugLog(float num) {
         DebugLog(num.ToString());
     }

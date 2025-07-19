@@ -30,13 +30,23 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         float scrollY = GetParentWindow().parentProgram.scrollY;
         
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
-        if (!dragged && scrollY != 0 && scrollY*0.1f+zoom > 0.1f) {
+        if (!dragged && scrollY != 0 && scrollY*0.1f+zoom > 0.1f && scrollY*0.1f+zoom < 4) {
             zoom += scrollY * 0.1f;
-            Utils.DebugLog(Position.Magnitude());
-            Position += scrollY > 0? (mousePos-(size*0.5f)) * -0.1f : (Position-(size*0.5f)) * -0.1f;
-            if (scrollY > 0) {
-                Position += (mousePos-(size*0.5f)) * (1f/(4*zoom));
-            }
+            /***********
+            // I will do positioning later. 
+            // But based on what I'm thinking now, the best way to do it would be to render each room to a surface the size of the region,
+            // then resize the rectangle that is used to render that surface to the window.
+            ***********/
+            // Utils.DebugLog((Position-(size*0.5f)).Magnitude());
+            // if (scrollY > 0) {
+            //     Position += Vector2.Normalize(Position-(size*0.5f)) * 100/(2*zoom); //(Position-(size*0.5f)) * (0.05f-(float)Math.Pow((zoom-4)/18, 2));
+            // }
+            // else if (scrollY < 0) {
+            //     Position += (Position-(size*0.5f)) * -0.1f;
+            // }
+            // if (scrollY > 0) {
+            //     Position += (mousePos-(size*0.5f)) * (1f/(4*zoom));
+            // }
         }
         
         if (GetParentWindow().IsFocused) {
