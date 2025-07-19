@@ -27,7 +27,7 @@ public static class Utils {
         return Math.Max(0, Math.Min(1, (x-min)/(max-min)));
     }
     public static float Lerp(float min, float max, float x) {
-        return Math.Max(min, Math.Min(max, min + max * x));
+        return Math.Max(min, Math.Min(max, min + (max-min) * x));
     }
     public static void DrawGeometryWithVertices(IntPtr renderer, Vector2 center, SDL.SDL_Vertex[] verticies) {
         for (int i = 0; i < verticies.Length; i++) {
