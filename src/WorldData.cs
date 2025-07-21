@@ -10,7 +10,6 @@ using SDL2;
 namespace WorldCustomizer;
 // To load the room images later, keep in mind that the y position in the "map_image_*.txt starts at the bottom of the region image, "map_*.png"
 unsafe class WorldData {
-    public IntPtr mapSurface;
     public List<RoomData> roomData;
     public string acronym;
     string fullParentDirName;
@@ -34,7 +33,6 @@ unsafe class WorldData {
         foreach (RoomData room in roomData) {
             room.Destroy();
         }
-        SDL.SDL_FreeSurface(mapSurface);
     }
 }
 unsafe class RoomData {
@@ -135,7 +133,7 @@ unsafe class RoomData {
         if (devMapData != null) {
             string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
             layer = Convert.ToInt32(devMapDataSplit[4]);
-            devPosition = new Vector2(float.Parse(devMapDataSplit[2]), float.Parse(devMapDataSplit[3]));
+            devPosition = new Vector2(float.Parse(devMapDataSplit[2]), -float.Parse(devMapDataSplit[3]));
         }
         else {
             layer = 0;
