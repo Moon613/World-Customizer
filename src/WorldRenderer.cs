@@ -1,7 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
-using System.Threading;
-using System.Threading.Tasks;
 using SDL2;
 
 #nullable enable
@@ -68,7 +67,7 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         dragged = false;
         currentlyFocusedLayers = 1;
         originalSize = size;
-        dragPosition = position;
+        dragPosition = Vector2.Zero;
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
@@ -78,7 +77,7 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         SDL.SDL_SetTextureBlendMode(layer3Texture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
         SDL.SDL_SetTextureBlendMode(finalTexture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
     }
-    ~WorldRenderer() {
+    public void Destroy() {
         SDL.SDL_DestroyTexture(layer1Texture);
         SDL.SDL_DestroyTexture(layer2Texture);
         SDL.SDL_DestroyTexture(layer3Texture);

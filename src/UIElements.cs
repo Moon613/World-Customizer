@@ -449,6 +449,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal Program parentProgram;
     internal IntPtr window;
     internal IntPtr renderer;
+    internal WorldRenderer? worldRenderer;
     internal bool IsFocused => ((SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS) | (SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS)) == ((int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
     internal WindowRenderCombo(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, null) {
         // Create a new window given a title, size, and passes it a flag indicating it should be shown.
@@ -518,6 +519,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_RenderDrawLineF(renderer, 0, i, size.X, i);
         }
         try {
+            worldRenderer?.Render(window, renderer);
             for (int i = 0; i < renderables.Count; i++) {
                 renderables[i].Render(window, renderer);
             }
@@ -529,6 +531,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     }
     public virtual void Update() {
         try {
+            worldRenderer?.Update();
             for (int i = 0; i < updatables.Count; i++) {
                 updatables[i].Update();
             }

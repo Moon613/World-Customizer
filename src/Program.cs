@@ -77,7 +77,7 @@ internal class Program {
         windows = new List<WindowRenderCombo>();
         WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
         windows.Add(mainWindow);
-        mainWindow.AddChild(new WorldRenderer(Vector2.Zero, mainWindow.size, mainWindow, mainWindow.renderer));
+        mainWindow.worldRenderer = new WorldRenderer(Vector2.Zero, mainWindow.size, mainWindow, mainWindow.renderer);
         OptionBar optionBar = new OptionBar(new Vector2(mainWindow.size.X, 32), mainWindow);
         mainWindow.AddChild(optionBar);
         optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
@@ -156,6 +156,7 @@ internal class Program {
         foreach (WindowRenderCombo window in windows) {
             SDL.SDL_DestroyRenderer(window.renderer);
             SDL.SDL_DestroyWindow(window.window);
+            window.worldRenderer?.Destroy();
         }
         currentWorld?.Destroy();
         SDL_ttf.TTF_CloseFont(Utils.currentFont);
