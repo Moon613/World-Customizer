@@ -61,12 +61,14 @@ unsafe class RoomData {
     /// <summary>
     /// The CPU image of the room constructed from tile data
     /// </summary>
+    public IntPtr? roomTexture;
     public IntPtr roomSurface;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
     public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData) {
         this.name = name;
+        roomTexture = null;
 
         // Go back 1 to account for the newline char
         int startOfGeoData = roomFileData.Length-1;
@@ -145,6 +147,9 @@ unsafe class RoomData {
     }
     public void Destroy() {
         SDL.SDL_FreeSurface(roomSurface);
+        if (roomTexture != null) {
+            SDL.SDL_DestroyTexture((IntPtr)roomTexture);
+        }
     }
     public override string ToString() {
         return name + $" {devPosition} {size} {layer}";
