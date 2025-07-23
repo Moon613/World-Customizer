@@ -101,6 +101,26 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
                 RenderRoom(renderer, room);
             }
         }
+
+        if ((currentlyFocusedLayers & 4) == 0) {
+            SDL.SDL_SetTextureAlphaMod(layer3Texture, 128);
+        }
+        else {
+            SDL.SDL_SetTextureAlphaMod(layer3Texture, 255);
+        }
+        if ((currentlyFocusedLayers & 2) == 0) {
+            SDL.SDL_SetTextureAlphaMod(layer2Texture, 128);
+        }
+        else {
+            SDL.SDL_SetTextureAlphaMod(layer2Texture, 255);
+        }
+        if ((currentlyFocusedLayers & 1) == 0) {
+            SDL.SDL_SetTextureAlphaMod(layer1Texture, 128);
+        }
+        else {
+            SDL.SDL_SetTextureAlphaMod(layer1Texture, 255);
+        }
+
         SDL.SDL_SetRenderTarget(renderer, finalTexture);
         var rect = new SDL.SDL_Rect(){x=0, y=0, w=(int)originalSize.X, h=(int)originalSize.Y};
         SDL.SDL_RenderCopy(renderer, layer3Texture, (IntPtr)null, ref rect);
@@ -119,9 +139,11 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         Vector2 mousePos = new Vector2(mouseX, mouseY);
         float scrollY = GetParentWindow().parentProgram.scrollY;
         
+        // Utils.DebugLog($"{zoom} + {scrollY} = {scrollY+zoom}");
+        Utils.DebugLog($"{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}");
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
-        if (!dragged && scrollY != 0 && scrollY*0.1f+zoom >= 1 && scrollY*0.1f+zoom <= 3) {
-            zoom += scrollY * 0.1f;
+        if (!dragged && scrollY != 0 && scrollY+zoom >= 1 && scrollY+zoom <= 20) {
+            zoom += (int)scrollY;
             if (scrollY > 0) {
                 Position += new Vector2(32, 18);
                 size -= new Vector2(64, 36);
@@ -135,13 +157,13 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         if (GetParentWindow().IsFocused) {
             if (GetParentWindow().parentProgram.clicked) {
                 dragged = true;
-                relativeToMouse = mousePos*(1/zoom) - dragPosition;
+                relativeToMouse = mousePos - dragPosition;
             }
             if (!GetParentWindow().parentProgram.mouseDown) {
                 dragged = false;
             }
             if (dragged) {
-                dragPosition = mousePos*(1/zoom) - relativeToMouse;
+                dragPosition = mousePos - relativeToMouse;
             }
         }
     }
@@ -151,19 +173,37 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
     void RenderRoom(IntPtr renderer, RoomData room) {
         if (room.roomTexture == null) {
             room.roomTexture = SDL.SDL_CreateTextureFromSurface(renderer, room.roomSurface);
+            SDL.SDL_SetTextureBlendMode((IntPtr)room.roomTexture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
         }
-        var r = new SDL.SDL_Rect(){x=(int)(dragPosition.X + room.devPosition.X*0.5f), y=(int)(dragPosition.Y + room.devPosition.Y*0.5f), w=(int)room.size.X, h=(int)room.size.Y};
+        var r = new SDL.SDL_FRect(){x=dragPosition.X + room.devPosition.X*0.5f, y=dragPosition.Y + room.devPosition.Y*0.5f, w=room.size.X, h=room.size.Y};
+        var outline = new SDL.SDL_FRect(){x=dragPosition.X + room.devPosition.X*0.5f - 2.5f, y=dragPosition.Y + room.devPosition.Y*0.5f - 12, w=room.size.X+5, h=room.size.Y+16.5f};;
         if (room.layer == 0) {
             SDL.SDL_SetRenderTarget(renderer, layer1Texture);
-            SDL.SDL_RenderCopy(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
+            SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref outline);
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL.SDL_RenderDrawRectF(renderer, ref outline);
+            SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
         else if (room.layer == 1) {
             SDL.SDL_SetRenderTarget(renderer, layer2Texture);
-            SDL.SDL_RenderCopy(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
+            SDL.SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref outline);
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL.SDL_RenderDrawRectF(renderer, ref outline);
+            SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
         else if (room.layer == 2) {
             SDL.SDL_SetRenderTarget(renderer, layer3Texture);
-            SDL.SDL_RenderCopy(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref outline);
+            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL.SDL_RenderDrawRectF(renderer, ref outline);
+            SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
+        }
+        Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
+        foreach (var con in room.roomConnections) {
+            Utils.DrawGeometryWithVertices(renderer, con+dragPosition+room.devPosition*0.5f, circle.ToArray());
         }
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);
     }

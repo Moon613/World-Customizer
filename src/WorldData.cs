@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
 using SDL2;
 
 #nullable enable
@@ -17,14 +16,23 @@ unsafe class WorldData {
         fullParentDirName = worldFolderPath;
         acronym = worldFolderPath.Substring(worldFolderPath.LastIndexOf(Path.DirectorySeparatorChar)+1);
         string roomsPath = worldFolderPath.Substring(0, worldFolderPath.LastIndexOf(Path.DirectorySeparatorChar)+1) + acronym + "-rooms";
+        
+        string worldFileData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "world_"+acronym+".txt");
+        int creaturesStart = worldFileData.IndexOf("CREATURES");
+        int creaturesEnd = worldFileData.IndexOf("END CREATURES");
+        string[] creatureSpawns = worldFileData.Substring(creaturesStart+10, creaturesEnd-creaturesStart-11).Split('\n');
 
         roomData = new();
         foreach (string roomFile in Directory.GetFiles(roomsPath).Where(x => x.EndsWith(".txt") && !x.Contains("settings"))) {
             string roomName = Path.GetFileNameWithoutExtension(roomFile);
-            string[] devMapData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "map_" + acronym + ".txt").Split('\n');
+            string[] devMapData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "map_"+acronym+".txt").Split('\n');
 
-            roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper())) ?? null));
+            roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper())) ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray()));
         }
+
+        int roomsStart = worldFileData.IndexOf("ROOMS");
+        int roomsEnd = worldFileData.IndexOf("END ROOMS");
+        string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).Split('\n');
     }
     /// <summary>
     /// Call this to correctly clean up memory used by this object, otherwise there *WILL* be mem leaks due to loaded textures.
@@ -36,7 +44,6 @@ unsafe class WorldData {
     }
 }
 unsafe class RoomData {
-    public Vector2 imageTexturePosition;
     public Vector2 devPosition;
     /// <summary>
     /// The size of the room in real interactible tiles on both axis
@@ -63,15 +70,17 @@ unsafe class RoomData {
     /// </summary>
     public IntPtr? roomTexture;
     public IntPtr roomSurface;
+    public List<Vector2> roomConnections;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
-    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData) {
+    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData, string[] spawnData) {
+        Utils.DebugLog(name);
         this.name = name;
         roomTexture = null;
 
         // Go back 1 to account for the newline char
-        int startOfGeoData = roomFileData.Length-1;
+        int startOfGeoData = roomFileData.Trim().Length-1;
         // Set this to one further back so that it is not a newline char
         char currentChar = roomFileData[startOfGeoData-1];
         // These are the chars I expect in the geo data part of the room.
@@ -101,35 +110,45 @@ unsafe class RoomData {
             waterLayer = 1;
         }
 
+        roomConnections = new();
         // We have the minimum needs to create the room surface, so we make the default now and fill it with useful pixels in the next part.
         // Also here be endianness
         roomSurface = SDL.SDL_CreateRGBSurface(0, (int)size.X, (int)size.Y, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
         SDL.SDL_SetSurfaceBlendMode(roomSurface, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
-        for (int i = 0; i < size.X; i++) {
+        try {
             for (int j = 0; j < size.Y; j++) {
-                var color = new SDL.SDL_Color(){r=255,g=0,b=0,a=255};
-                int[] singleTileData = Array.ConvertAll(tileData[j + (int)size.Y*i].Split(','), x => Convert.ToInt32(x));
+                for (int i = 0; i < size.X; i++) {
+                    var color = new SDL.SDL_Color(){r=255,g=0,b=0,a=255};
+                    int[] singleTileData = Array.ConvertAll(tileData[j + (int)size.Y*i].Split(','), x => Convert.ToInt32(x));
 
-                if (singleTileData[0] == 1 || singleTileData[0] == 4) {
-                    color.r = 0;
-                    if (waterLayer == 1 && waterLayer > 0 && size.Y-j < waterLevel+2) {
-                        color.b = 255;
+                    if (singleTileData[0] == 1 || singleTileData[0] == 4) {
+                        color.r = 0;
+                        if (waterLayer == 1 && waterLayer > 0 && size.Y-j < waterLevel+2) {
+                            color.b = 255;
+                        }
+                        if (singleTileData.Length >= 2 && singleTileData[1] == 4) {
+                            color.r = 255;
+                            color.b = 255;
+                            roomConnections.Add(new Vector2(i, j));
+                        }
                     }
-                }
-                else if (singleTileData[0] == 2 || singleTileData[0] == 3) {
-                    color.r = 153;
-                }
-                else if (singleTileData[0] == 0 && singleTileData.Length >= 2) {
-                    if (singleTileData[1] == 1 || singleTileData[1] == 2) {
+                    else if (singleTileData[0] == 2 || singleTileData[0] == 3) {
                         color.r = 153;
                     }
-                    if (waterLevel > 0 && size.Y-j < waterLevel+2) {
-                        color.b = 255;
+                    else if (singleTileData[0] == 0 && singleTileData.Length >= 2) {
+                        if (singleTileData[1] == 1 || singleTileData[1] == 2) {
+                            color.r = 153;
+                        }
+                        if (waterLevel > 0 && size.Y-j < waterLevel+2) {
+                            color.b = 255;
+                        }
                     }
-                }
 
-                Utils.SetPixel(roomSurface, i, j, color);
+                    Utils.SetPixel(roomSurface, i, j, color);
+                }
             }
+        } catch (Exception err) {
+            Utils.DebugLog(err);
         }
         
         if (devMapData != null) {
@@ -143,7 +162,7 @@ unsafe class RoomData {
         }
         Utils.DebugLog(devMapData ?? "");
 
-        // imageTexturePosition = new Vector2(100);
+        // SDL_image.IMG_SavePNG(roomSurface, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "roomTextures" + Path.DirectorySeparatorChar + name.ToUpper()+".png");
     }
     public void Destroy() {
         SDL.SDL_FreeSurface(roomSurface);

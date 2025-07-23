@@ -86,6 +86,17 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), new Vector2(300, 300), parent);
         parent.AddChild(colorSelector);
     }
+    internal void ToggleLayer(Button button) {
+        if (button.text == "Layer 1") {
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 1;
+        }
+        if (button.text == "Layer 2") {
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 2;
+        }
+        if (button.text == "Layer 3") {
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 4;
+        }
+    }
 }
 /// <summary>
 /// A small menu that pops up when clicking or right-clicking on a parent to provide options what to do.

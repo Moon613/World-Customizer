@@ -82,7 +82,10 @@ internal class Program {
         mainWindow.AddChild(optionBar);
         optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
             new Tuple<string, Action<Button>>("File", optionBar.OpenFileContextMenu),
-            new Tuple<string, Action<Button>>("Preferences", new Action<Button>(optionBar.OpenPreferencesContextMenu))
+            new Tuple<string, Action<Button>>("Preferences", optionBar.OpenPreferencesContextMenu),
+            new Tuple<string, Action<Button>>("Layer 1", optionBar.ToggleLayer),
+            new Tuple<string, Action<Button>>("Layer 2", optionBar.ToggleLayer),
+            new Tuple<string, Action<Button>>("Layer 3", optionBar.ToggleLayer)
             }, optionBar, new Vector2(0, 0), 14, 5, 8));
     }
 
@@ -141,7 +144,7 @@ internal class Program {
         }
     }
     /// <summary>
-    /// Renders to the window.
+    /// Renders all windows.
     /// </summary>
     public void Render() {
         for (int i = 0; i < windows.Count; i++) {
