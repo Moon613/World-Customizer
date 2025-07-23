@@ -8,21 +8,65 @@ using SDL2;
 namespace WorldCustomizer;
 
 class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
-    float zoom;
-    bool dragged;
-    int currentlyFocusedLayer;
-    Vector2 relativeToMouse;
-    IntPtr layer1Texture;
-    IntPtr layer2Texture;
-    IntPtr layer3Texture;
-    IntPtr finalTexture;
-    Vector2 originalSize;
-    Vector2 dragPosition;
+    static List<SDL.SDL_Vertex> circle = [
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
+    ];
+    public int zoom;
+    public bool dragged;
+    /// <summary>
+    /// This is a bitmask for which layers to draw with transparency.<br></br>If a layer's bit is set to 0 then it will be transparent.
+    /// </summary>
+    public byte currentlyFocusedLayers;
+    /// <summary>
+    /// Used when dragging the world around, so that it stays relative to the mouse when moving.
+    /// </summary>
+    public Vector2 relativeToMouse;
+    /// <summary>
+    /// The texture that all rooms on layer 1 are rendered to.
+    /// </summary>
+    public IntPtr layer1Texture;
+    /// <summary>
+    /// The texture that all rooms on layer 2 are rendered to.
+    /// </summary>
+    public IntPtr layer2Texture;
+    /// <summary>
+    /// The texture that all rooms on layer 3 are rendered to.
+    /// </summary>
+    public IntPtr layer3Texture;
+    /// <summary>
+    /// The render target for all the layer textures once their rooms are drawn.<br></br>Layer 3 is drawn first and layer 1 last,
+    /// so rooms on layer 1 cover up rooms on layer 3.
+    /// </summary>
+    public IntPtr finalTexture;
+    /// <summary>
+    /// The original size the renderer was created with.<br></br>
+    /// This is so that the layer textures can be drawn to the final texture at the same size they were all created with.
+    /// </summary>
+    public Vector2 originalSize;
+    /// <summary>
+    /// Keeps track of how to view has been moved around,
+    /// so that the rooms can move without effecting the position of the world renderer.
+    /// </summary>
+    public Vector2 dragPosition;
     private WorldData? WorldData { get { return GetParentWindow().parentProgram.currentWorld; }}
     public WorldRenderer(Vector2 position, Vector2 size, GenericUIElement parent, IntPtr renderer) : base(position, size, parent) {
-        zoom = 1f;
+        zoom = 1;
         dragged = false;
-        currentlyFocusedLayer = 0;
+        currentlyFocusedLayers = 1;
         originalSize = size;
         dragPosition = position;
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);

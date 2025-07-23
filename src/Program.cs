@@ -37,7 +37,13 @@ class Entry {
 }
 internal class Program {
     public bool running = true;
+    /// <summary>
+    /// Is true if the mouse is being held down.
+    /// </summary>
     internal bool mouseDown = false;
+    /// <summary>
+    /// Is true if the mouse was clicked this frame.
+    /// </summary>
     internal bool clicked = false;
     internal float scrollY;
     internal string? folderToLoadFrom = null;
@@ -48,7 +54,8 @@ internal class Program {
     #pragma warning restore CS8618
 
     /// <summary>
-    /// Setup all of the SDL resources needed to display a window and draw text.
+    /// Setup all of the SDL resources needed to display a window and draw text.<br/>
+    /// Also creates the "main" window.
     /// </summary>
     public void Setup() {
         if (File.Exists(Utils.DebugLogPath) && File.ReadAllText(Utils.DebugLogPath) != "") {
@@ -111,9 +118,15 @@ internal class Program {
             }
         }
     }
+    /// <summary>
+    /// Creates a new window for browsing files.
+    /// </summary>
     public void OpenFileBrowser() {
         windows.Add(new FileBrowser(Vector2.Zero, FileBrowser.FileBrowserSize, this, "File Browser", SDL.SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_BORDERLESS, Directory.GetCurrentDirectory()));
     }
+    /// <summary>
+    /// Updates all windows. If <see cref="folderToLoadFrom"/> is not null it will open that region.
+    /// </summary>
     public void Update() {
         for (int i = 0; i < windows.Count; i++) {
             windows[i].Update();
