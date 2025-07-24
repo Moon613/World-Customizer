@@ -56,7 +56,7 @@ unsafe class RoomData {
     /// <summary>
     /// The layer that the room is on in the in-game slugcat view of the map.<br></br>0 is the top layer and 2 is the bottom layer
     /// </summary>
-    public int layer;
+    public WorldRenderer.Layers layer;
     /// <summary>
     /// Water level, 0/-1 if not present.
     /// </summary>
@@ -153,11 +153,11 @@ unsafe class RoomData {
         
         if (devMapData != null) {
             string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
-            layer = Convert.ToInt32(devMapDataSplit[4]);
+            layer = Utils.ByteToLayer(Convert.ToByte(devMapDataSplit[4]));
             devPosition = new Vector2(float.Parse(devMapDataSplit[2]), -float.Parse(devMapDataSplit[3]));
         }
         else {
-            layer = 0;
+            layer = WorldRenderer.Layers.Layer1;
             devPosition = Vector2.Zero;
         }
         Utils.DebugLog(devMapData ?? "");

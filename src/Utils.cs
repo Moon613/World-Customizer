@@ -12,6 +12,16 @@ namespace WorldCustomizer;
 public static class Utils {
     public static IntPtr currentFont;
     public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
+    internal static WorldRenderer.Layers ByteToLayer(byte l) {
+        WorldRenderer.Layers layer = l switch
+        {
+            1 => WorldRenderer.Layers.Layer2,
+            2 => WorldRenderer.Layers.Layer3,
+            _ => WorldRenderer.Layers.Layer1,
+        };
+        Utils.DebugLog((byte)layer);
+        return layer;
+    }
     public static float Magnitude(this Vector2 vector) {
         return (float)Math.Sqrt(Math.Pow(vector.X, 2) + Math.Pow(vector.Y, 2));
     }

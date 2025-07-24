@@ -88,13 +88,13 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
     }
     internal void ToggleLayer(Button button) {
         if (button.text == "Layer 1") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 1;
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer1;
         }
         if (button.text == "Layer 2") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 2;
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer2;
         }
         if (button.text == "Layer 3") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= 4;
+            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer3;
         }
     }
 }

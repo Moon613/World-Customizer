@@ -6,7 +6,13 @@ using SDL2;
 #nullable enable
 namespace WorldCustomizer;
 
-class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
+internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
+    [Flags]
+    public enum Layers : byte {
+        Layer1 = 1,
+        Layer2 = 2,
+        Layer3 = 4
+    }
     static List<SDL.SDL_Vertex> circle = [
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
@@ -29,7 +35,7 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
     /// <summary>
     /// This is a bitmask for which layers to draw with transparency.<br></br>If a layer's bit is set to 0 then it will be transparent.
     /// </summary>
-    public byte currentlyFocusedLayers;
+    public Layers currentlyFocusedLayers;
     /// <summary>
     /// Used when dragging the world around, so that it stays relative to the mouse when moving.
     /// </summary>
@@ -61,13 +67,15 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
     /// so that the rooms can move without effecting the position of the world renderer.
     /// </summary>
     public Vector2 dragPosition;
+    RoomData? currentlyHoveredRoom;
     private WorldData? WorldData { get { return GetParentWindow().parentProgram.currentWorld; }}
     public WorldRenderer(Vector2 position, Vector2 size, GenericUIElement parent, IntPtr renderer) : base(position, size, parent) {
         zoom = 1;
         dragged = false;
-        currentlyFocusedLayers = 1;
+        currentlyFocusedLayers = Layers.Layer1;
         originalSize = size;
         dragPosition = Vector2.Zero;
+        currentlyHoveredRoom = null;
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
@@ -102,19 +110,19 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
             }
         }
 
-        if ((currentlyFocusedLayers & 4) == 0) {
+        if (!IsLayerInteractible(Layers.Layer3)) {
             SDL.SDL_SetTextureAlphaMod(layer3Texture, 128);
         }
         else {
             SDL.SDL_SetTextureAlphaMod(layer3Texture, 255);
         }
-        if ((currentlyFocusedLayers & 2) == 0) {
+        if (!IsLayerInteractible(Layers.Layer2)) {
             SDL.SDL_SetTextureAlphaMod(layer2Texture, 128);
         }
         else {
             SDL.SDL_SetTextureAlphaMod(layer2Texture, 255);
         }
-        if ((currentlyFocusedLayers & 1) == 0) {
+        if (!IsLayerInteractible(Layers.Layer1)) {
             SDL.SDL_SetTextureAlphaMod(layer1Texture, 128);
         }
         else {
@@ -139,10 +147,8 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         Vector2 mousePos = new Vector2(mouseX, mouseY);
         float scrollY = GetParentWindow().parentProgram.scrollY;
         
-        // Utils.DebugLog($"{zoom} + {scrollY} = {scrollY+zoom}");
-        Utils.DebugLog($"{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}");
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
-        if (!dragged && scrollY != 0 && scrollY+zoom >= 1 && scrollY+zoom <= 20) {
+        if (!dragged && scrollY != 0 && (int)scrollY+zoom >= 1 && (int)scrollY+zoom <= 20) {
             zoom += (int)scrollY;
             if (scrollY > 0) {
                 Position += new Vector2(32, 18);
@@ -153,17 +159,48 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
                 size += new Vector2(64, 36);
             }
         }
+
+        Vector2 scaledMousePos = (size / originalSize) * mousePos + Position;
+        Utils.DebugLog($"{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}\n{originalSize}, {size}, {scaledMousePos}");
         
         if (GetParentWindow().IsFocused) {
+            // This is used to report if the mouse is currently over a room on the current frame, so that it is not immediantly de-selected when
+            // not dragging it around.
+            bool mouseOverRoom = false;
+            if (WorldData != null) {
+                foreach (RoomData room in WorldData.roomData) {
+                    Vector2 roomPosition = dragPosition + room.devPosition*0.5f;
+                    if (!dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X && scaledMousePos.X < roomPosition.X+room.size.X && scaledMousePos.Y > roomPosition.Y && scaledMousePos.Y < roomPosition.Y+room.size.Y && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
+                        currentlyHoveredRoom = room;
+                        mouseOverRoom = true;
+                    }
+                }
+            }
+            // If the mouse is not over a room and one is not currently being moved,
+            // then the currently hovered room is set to null. The dragged check is because the room
+            // can lag behind the mouse if the mouse moves fast enough.
+            if (!mouseOverRoom && !dragged) {
+                currentlyHoveredRoom = null;
+            }
             if (GetParentWindow().parentProgram.clicked) {
                 dragged = true;
-                relativeToMouse = mousePos - dragPosition;
+                if (currentlyHoveredRoom != null) {
+                    relativeToMouse = scaledMousePos - currentlyHoveredRoom.devPosition*0.5f;
+                }
+                else {
+                    relativeToMouse = scaledMousePos - dragPosition;
+                }
             }
             if (!GetParentWindow().parentProgram.mouseDown) {
                 dragged = false;
             }
             if (dragged) {
-                dragPosition = mousePos - relativeToMouse;
+                if (currentlyHoveredRoom != null) {
+                    currentlyHoveredRoom.devPosition = 2*(scaledMousePos-relativeToMouse);
+                }
+                else {
+                    dragPosition = scaledMousePos - relativeToMouse;
+                }
             }
         }
     }
@@ -176,26 +213,30 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_SetTextureBlendMode((IntPtr)room.roomTexture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
         }
         var r = new SDL.SDL_FRect(){x=dragPosition.X + room.devPosition.X*0.5f, y=dragPosition.Y + room.devPosition.Y*0.5f, w=room.size.X, h=room.size.Y};
-        var outline = new SDL.SDL_FRect(){x=dragPosition.X + room.devPosition.X*0.5f - 2.5f, y=dragPosition.Y + room.devPosition.Y*0.5f - 12, w=room.size.X+5, h=room.size.Y+16.5f};;
-        if (room.layer == 0) {
+        var outline = new SDL.SDL_FRect(){x=dragPosition.X + room.devPosition.X*0.5f - 2.5f, y=dragPosition.Y + room.devPosition.Y*0.5f - 12, w=room.size.X+5, h=room.size.Y+16.5f};
+        byte bkgFillModifier = 0;
+        if (currentlyHoveredRoom == room) {
+            bkgFillModifier = 128;
+        }
+        if (room.layer == Layers.Layer1) {
             SDL.SDL_SetRenderTarget(renderer, layer1Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL.SDL_SetRenderDrawColor(renderer, bkgFillModifier, bkgFillModifier, bkgFillModifier, 255);
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
             SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
-        else if (room.layer == 1) {
+        else if (room.layer == Layers.Layer2) {
             SDL.SDL_SetRenderTarget(renderer, layer2Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL.SDL_SetRenderDrawColor(renderer,bkgFillModifier, 255,bkgFillModifier, 255);
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
             SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
-        else if (room.layer == 2) {
+        else if (room.layer == Layers.Layer3) {
             SDL.SDL_SetRenderTarget(renderer, layer3Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL.SDL_SetRenderDrawColor(renderer, 255, bkgFillModifier, bkgFillModifier, 255);
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
@@ -206,5 +247,8 @@ class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
             Utils.DrawGeometryWithVertices(renderer, con+dragPosition+room.devPosition*0.5f, circle.ToArray());
         }
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);
+    }
+    private bool IsLayerInteractible(Layers layer) {
+        return (currentlyFocusedLayers & layer) != 0;
     }
 }
