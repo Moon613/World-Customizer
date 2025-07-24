@@ -131,9 +131,6 @@ internal class Program {
     /// Updates all windows. If <see cref="folderToLoadFrom"/> is not null it will open that region.
     /// </summary>
     public void Update() {
-        for (int i = 0; i < windows.Count; i++) {
-            windows[i].Update();
-        }
         if (folderToLoadFrom != null) {
             currentWorld?.Destroy();
             currentWorld = new WorldData(folderToLoadFrom, windows[0].renderer);
@@ -141,7 +138,12 @@ internal class Program {
                 Utils.DebugLog(room.ToString());
             }
             folderToLoadFrom = null;
+            windows[0].worldRenderer.dragPosition = windows[0].size*0.5f;
         }
+        windows.Last().Update();
+        // for (int i = 0; i < windows.Count; i++) {
+        //     windows[i].Update();
+        // }
     }
     /// <summary>
     /// Renders all windows.

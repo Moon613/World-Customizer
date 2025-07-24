@@ -25,32 +25,51 @@ internal abstract class GenericUIElement {
     }
     internal abstract WindowRenderCombo GetParentWindow();
 }
-internal abstract class Draggable : GenericUIElement, IRenderable, IAmInteractable {
+internal abstract class FocusableUIElement : GenericUIElement, IAmInteractable {
+    internal FocusableUIElement(Vector2 position, Vector2 size, GenericUIElement? parent) : base(position, size, parent) {
+    }
+    public virtual void Signal(string text) {
+        throw new NotImplementedException();
+    }
+    public virtual void Update() {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        if (mouseX >= Position.X && mouseX <= Position.X+size.X && mouseY >= Position.Y && mouseY <= Position.Y+size.Y) {
+            GetParentWindow().elementToFocus = this;
+        }
+        else if (GetParentWindow().currentlyFocusedObject == this) {
+            GetParentWindow().currentlyFocusedObject = null;
+        }
+    }
+    internal override WindowRenderCombo GetParentWindow() {
+        return parent.GetParentWindow();
+    }
+}
+internal abstract class Draggable : FocusableUIElement, IRenderable {
     internal Vector2? mouseOffset;
     const int Handle_Height = 15;
     internal Draggable(Vector2 position, Vector2 size, GenericUIElement parent) : base (position, size, parent) {
         mouseOffset = null;
-    }
-    internal override WindowRenderCombo GetParentWindow() {
-        return parent.GetParentWindow();
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {
         var r = new SDL.SDL_FRect(){x=Position.X, y=Position.Y, w=size.X, h=Handle_Height};
         SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
         SDL.SDL_RenderFillRectF(renderer, ref r);
     }
-    public virtual void Signal(string text) {
+    public override void Signal(string text) {
     }
-    public virtual void Update() {
+    public override void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (mouseOffset == null && GetParentWindow().parentProgram.clicked && mouseX > Position.X && mouseX < Position.X+size.X && mouseY > Position.Y && mouseY < Position.Y+Handle_Height) {
-            mouseOffset = new Vector2(mouseX, mouseY) - Position;
+        if (GetParentWindow().IsFocused && GetParentWindow().currentlyFocusedObject == this) {
+            if (mouseOffset == null && GetParentWindow().parentProgram.clicked && mouseX > Position.X && mouseX < Position.X+size.X && mouseY > Position.Y && mouseY < Position.Y+Handle_Height) {
+                mouseOffset = new Vector2(mouseX, mouseY) - Position;
+            }
+            if (mouseOffset != null && !GetParentWindow().parentProgram.mouseDown) {
+                mouseOffset = null;
+            }
+            if (mouseOffset != null) {
+                Position = new Vector2(mouseX, mouseY) - (Vector2)mouseOffset;
+            }
         }
-        if (mouseOffset != null && !GetParentWindow().parentProgram.mouseDown) {
-            mouseOffset = null;
-        }
-        if (mouseOffset != null) {
-            Position = new Vector2(mouseX, mouseY) - (Vector2)mouseOffset;
-        }
+        base.Update();
     }
 }

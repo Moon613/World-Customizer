@@ -6,7 +6,7 @@ using SDL2;
 #nullable enable
 namespace WorldCustomizer;
 
-internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
+internal class WorldRenderer : FocusableUIElement, IRenderable {
     [Flags]
     public enum Layers : byte {
         Layer1 = 1,
@@ -139,12 +139,15 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         var finalRect = new SDL.SDL_Rect(){x=(int)_position.X, y=(int)_position.Y, w=(int)size.X, h=(int)size.Y};
         SDL.SDL_RenderCopy(renderer, finalTexture, ref finalRect, (IntPtr)null);
     }
-    public void Signal(string text) {
-        throw new NotImplementedException();
-    }
-    public void Update() {
+    public override void Update() {
+        base.Update();
+        if (GetParentWindow().currentlyFocusedObject != this) {
+            return;
+        }
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         Vector2 mousePos = new Vector2(mouseX, mouseY);
+        SDL.SDL_GetWindowSize(GetParentWindow().window, out int w, out int h);
+        Vector2 currentWindowSize = new Vector2(w, h);
         float scrollY = GetParentWindow().parentProgram.scrollY;
         
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
@@ -160,8 +163,8 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
             }
         }
 
-        Vector2 scaledMousePos = (size / originalSize) * mousePos + Position;
-        Utils.DebugLog($"{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}\n{originalSize}, {size}, {scaledMousePos}");
+        Vector2 scaledMousePos = (size / currentWindowSize) * mousePos + Position;
+        Utils.DebugLog($"{dragged}\n{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}\n{currentWindowSize}, {size}, {scaledMousePos}");
         
         if (GetParentWindow().IsFocused) {
             // This is used to report if the mouse is currently over a room on the current frame, so that it is not immediantly de-selected when
@@ -182,7 +185,7 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
             if (!mouseOverRoom && !dragged) {
                 currentlyHoveredRoom = null;
             }
-            if (GetParentWindow().parentProgram.clicked) {
+            if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked) {
                 dragged = true;
                 if (currentlyHoveredRoom != null) {
                     relativeToMouse = scaledMousePos - currentlyHoveredRoom.devPosition*0.5f;
@@ -191,7 +194,7 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
                     relativeToMouse = scaledMousePos - dragPosition;
                 }
             }
-            if (!GetParentWindow().parentProgram.mouseDown) {
+            if (GetParentWindow().IsFocused && !GetParentWindow().parentProgram.mouseDown) {
                 dragged = false;
             }
             if (dragged) {
@@ -203,9 +206,6 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
                 }
             }
         }
-    }
-    internal override WindowRenderCombo GetParentWindow() {
-        return parent.GetParentWindow();
     }
     void RenderRoom(IntPtr renderer, RoomData room) {
         if (room.roomTexture == null) {

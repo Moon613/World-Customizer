@@ -12,7 +12,7 @@ namespace WorldCustomizer;
 /// <summary>
 /// The top menu bar, always present and provides a way to save, load, set preferences, ect.
 /// </summary>
-internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
+internal class OptionBar : FocusableUIElement, IRenderable {
     List<Button>? options;
     ContextMenu? contextMenu;
     new WindowRenderCombo parent;
@@ -43,13 +43,14 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         // If the context menu is being displayed, then render it.
         contextMenu?.Render(window, renderer);
     }
-    public void Update() {
+    public override void Update() {
+        base.Update();
         contextMenu?.Update();
         foreach (Button button in options) {
             button.Update();
         }
     }
-    public void Signal(string text) {
+    public override void Signal(string text) {
         if (text == ContextMenu.RemoveCtxMenu) {
             contextMenu = null;
         }
@@ -69,6 +70,7 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
         #pragma warning restore CS8604, IDE0090, IDE0028
     }
     public void LoadFile(Button _) {
+        Signal(ContextMenu.RemoveCtxMenu);
         GetParentWindow().parentProgram.OpenFileBrowser();
     }
     public void OpenPreferencesContextMenu(Button _) {
@@ -101,7 +103,7 @@ internal class OptionBar : GenericUIElement, IRenderable, IAmInteractable {
 /// <summary>
 /// A small menu that pops up when clicking or right-clicking on a parent to provide options what to do.
 /// </summary>
-class ContextMenu : GenericUIElement, IRenderable, IAmInteractable {
+class ContextMenu : FocusableUIElement, IRenderable {
     List<Button>? options;
     internal bool focused;
     internal const string RemoveCtxMenu = "REMOVECTXMENU";
@@ -131,7 +133,8 @@ class ContextMenu : GenericUIElement, IRenderable, IAmInteractable {
             opt.Render(window, renderer);
         }
     }
-    public void Update() {
+    public override void Update() {
+        base.Update();
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         if (focused && (mouseX < Position.X-GraceDistance || mouseX > Position.X+size.X+GraceDistance || mouseY < Position.Y-GraceDistance || mouseY > Position.Y+size.Y+GraceDistance)) {
             Signal(RemoveCtxMenu);
@@ -148,13 +151,10 @@ class ContextMenu : GenericUIElement, IRenderable, IAmInteractable {
             button.Update();
         }
     }
-    public void Signal(string text) {
+    public override void Signal(string text) {
         if (parent is IAmInteractable interactable) {
             interactable.Signal(text);
         }
-    }
-    internal override WindowRenderCombo GetParentWindow() {
-        return parent.GetParentWindow();
     }
 }
 class ColorSelector : Draggable {
@@ -425,7 +425,6 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
         return parent.GetParentWindow();
     }
 }
-
 class ButtonWithImage : Button {
     readonly string image;
     Vector2 imageSize;
@@ -452,7 +451,6 @@ class ButtonWithImage : Button {
         SDL.SDL_DestroyTexture(texture);
     }
 }
-
 class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal readonly List<IRenderable> renderables;
     internal readonly List<IAmInteractable> updatables;
@@ -461,6 +459,8 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal IntPtr window;
     internal IntPtr renderer;
     internal WorldRenderer? worldRenderer;
+    internal FocusableUIElement? currentlyFocusedObject;
+    internal FocusableUIElement? elementToFocus;
     internal bool IsFocused => ((SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS) | (SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS)) == ((int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
     internal WindowRenderCombo(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, null) {
         // Create a new window given a title, size, and passes it a flag indicating it should be shown.
@@ -486,6 +486,8 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         this.renderables = new List<IRenderable>();
         this.updatables = new List<IAmInteractable>();
         this.backgroundColor = new SDL.SDL_Color(){r=8, g=38, b=82, a=255};
+        this.currentlyFocusedObject = null;
+        this.elementToFocus = null;
     }
     public void AddChild(GenericUIElement child) {
         if (child is IRenderable renderable) {
@@ -542,6 +544,11 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     }
     public virtual void Update() {
         try {
+            if (elementToFocus != null) {
+                currentlyFocusedObject = elementToFocus;
+                elementToFocus = null;
+            }
+            // Utils.DebugLog(currentlyFocusedObject?.GetType()?.ToString() ?? "null");
             worldRenderer?.Update();
             for (int i = 0; i < updatables.Count; i++) {
                 updatables[i].Update();
