@@ -151,12 +151,12 @@ internal class WorldRenderer : GenericUIElement, IRenderable, IAmInteractable {
         if (!dragged && scrollY != 0 && (int)scrollY+zoom >= 1 && (int)scrollY+zoom <= 20) {
             zoom += (int)scrollY;
             if (scrollY > 0) {
-                Position += new Vector2(32, 18);
-                size -= new Vector2(64, 36);
+                Position += (int)scrollY * new Vector2(32, 18);
+                size -= (int)scrollY * new Vector2(64, 36);
             }
             else if (scrollY < 0) {
-                Position -= new Vector2(32, 18);
-                size += new Vector2(64, 36);
+                Position += (int)scrollY * new Vector2(32, 18);
+                size -= (int)scrollY * new Vector2(64, 36);
             }
         }
 
