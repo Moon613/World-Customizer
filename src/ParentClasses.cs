@@ -33,7 +33,8 @@ internal abstract class FocusableUIElement : GenericUIElement, IAmInteractable {
     }
     public virtual void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (mouseX >= Position.X && mouseX <= Position.X+size.X && mouseY >= Position.Y && mouseY <= Position.Y+size.Y) {
+        if ((mouseX >= Position.X && mouseX <= Position.X+size.X && mouseY >= Position.Y && mouseY <= Position.Y+size.Y) 
+        || (this is WorldRenderer)) {
             GetParentWindow().elementToFocus = this;
         }
         else if (GetParentWindow().currentlyFocusedObject == this) {

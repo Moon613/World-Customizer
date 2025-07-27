@@ -19,7 +19,6 @@ public static class Utils {
             2 => WorldRenderer.Layers.Layer3,
             _ => WorldRenderer.Layers.Layer1,
         };
-        Utils.DebugLog((byte)layer);
         return layer;
     }
     public static float Magnitude(this Vector2 vector) {

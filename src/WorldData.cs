@@ -21,18 +21,17 @@ unsafe class WorldData {
         int creaturesStart = worldFileData.IndexOf("CREATURES");
         int creaturesEnd = worldFileData.IndexOf("END CREATURES");
         string[] creatureSpawns = worldFileData.Substring(creaturesStart+10, creaturesEnd-creaturesStart-11).Split('\n');
+        int roomsStart = worldFileData.IndexOf("ROOMS");
+        int roomsEnd = worldFileData.IndexOf("END ROOMS");
+        string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).Split('\n');
 
         roomData = new();
         foreach (string roomFile in Directory.GetFiles(roomsPath).Where(x => x.EndsWith(".txt") && !x.Contains("settings"))) {
             string roomName = Path.GetFileNameWithoutExtension(roomFile);
             string[] devMapData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "map_"+acronym+".txt").Split('\n');
 
-            roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper())) ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray()));
+            roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper()+":")) ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray(), roomConnections.FirstOrDefault(x => x.StartsWith(roomName.ToUpper() + " :") || x.StartsWith(roomName.ToUpper() + ":"))));
         }
-
-        int roomsStart = worldFileData.IndexOf("ROOMS");
-        int roomsEnd = worldFileData.IndexOf("END ROOMS");
-        string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).Split('\n');
     }
     /// <summary>
     /// Call this to correctly clean up memory used by this object, otherwise there *WILL* be mem leaks due to loaded textures.
@@ -70,11 +69,12 @@ unsafe class RoomData {
     /// </summary>
     public IntPtr? roomTexture;
     public IntPtr roomSurface;
-    public List<Vector2> roomConnections;
+    public List<Vector2> roomConnectionPositions;
+    public List<string> roomConnections;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
-    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData, string[] spawnData) {
+    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData, string[] spawnData, string? roomConnections) {
         Utils.DebugLog(name);
         this.name = name;
         roomTexture = null;
@@ -93,7 +93,7 @@ unsafe class RoomData {
         startOfGeoData++;
 
         // Separate the tile data into an array for each tile.
-        string[] tileData = roomFileData.Substring(startOfGeoData).Split(['|'], StringSplitOptions.RemoveEmptyEntries).Where(x => !x.Contains('\n')).ToArray();
+        string[] tileData = roomFileData.Substring(startOfGeoData).Trim().Split(['|'], StringSplitOptions.RemoveEmptyEntries).Where(x => !x.Contains('\n')).ToArray();
 
         // Get the room size in terms of the amount of tiles inside the interatible part of the room on each axis.
         string[] sizeAndWaterData = roomFileData.Substring(roomFileData.IndexOf('\n'), roomFileData.IndexOf('\n', roomFileData.IndexOf('\n')+1) - roomFileData.IndexOf('\n')).Split('|');
@@ -110,7 +110,7 @@ unsafe class RoomData {
             waterLayer = 1;
         }
 
-        roomConnections = new();
+        roomConnectionPositions = new();
         // We have the minimum needs to create the room surface, so we make the default now and fill it with useful pixels in the next part.
         // Also here be endianness
         roomSurface = SDL.SDL_CreateRGBSurface(0, (int)size.X, (int)size.Y, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
@@ -129,7 +129,12 @@ unsafe class RoomData {
                         if (singleTileData.Length >= 2 && singleTileData[1] == 4) {
                             color.r = 255;
                             color.b = 255;
-                            roomConnections.Add(new Vector2(i, j));
+                            roomConnectionPositions.Add(new Vector2(i, j));
+                        }
+                        else if (singleTileData.Length >= 3 && singleTileData[1] == 3 && singleTileData[2] == 4) {
+                            color.r = 255;
+                            color.b = 255;
+                            roomConnectionPositions.Add(new Vector2(i, j));
                         }
                     }
                     else if (singleTileData[0] == 2 || singleTileData[0] == 3) {
@@ -142,6 +147,11 @@ unsafe class RoomData {
                         if (waterLevel > 0 && size.Y-j < waterLevel+2) {
                             color.b = 255;
                         }
+                        if (singleTileData[1] == 4) {
+                            color.r = 255;
+                            color.b = 255;
+                            roomConnectionPositions.Add(new Vector2(i, j));
+                        }
                     }
 
                     Utils.SetPixel(roomSurface, i, j, color);
@@ -151,6 +161,7 @@ unsafe class RoomData {
             Utils.DebugLog(err);
         }
         
+        // Set the dev position if it exists. If it does not, the room gets the default (0,0)
         if (devMapData != null) {
             string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
             layer = Utils.ByteToLayer(Convert.ToByte(devMapDataSplit[4]));
@@ -160,9 +171,24 @@ unsafe class RoomData {
             layer = WorldRenderer.Layers.Layer1;
             devPosition = Vector2.Zero;
         }
-        Utils.DebugLog(devMapData ?? "");
 
-        // SDL_image.IMG_SavePNG(roomSurface, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "roomTextures" + Path.DirectorySeparatorChar + name.ToUpper()+".png");
+        Utils.DebugLog(roomConnections ?? "");
+        this.roomConnections = Enumerable.Repeat("DISCONNECTED", roomConnectionPositions.Count).ToList();
+        if (roomConnections != null) {
+            string[] roomsConnectedTo = roomConnections.Split(':')[1].Trim().Split(',');
+
+            int i = 0;
+            for (; i < roomsConnectedTo.Length && i < this.roomConnections.Count; i++) {
+                this.roomConnections[i] = roomsConnectedTo[i].Trim();
+            }
+            if (i < this.roomConnections.Count) {
+                Utils.DebugLog("ERROR, there may be extra room connections in the leditor file or you are missing some connections in your world file.\nMake sure to use DISCONNECTED if you want to leave some connections unused.");
+            }
+        }
+
+        Utils.DebugLog((devMapData ?? "") + "\n");
+
+        SDL_image.IMG_SavePNG(roomSurface, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "roomTextures" + Path.DirectorySeparatorChar + name.ToUpper()+".png");
     }
     public void Destroy() {
         SDL.SDL_FreeSurface(roomSurface);

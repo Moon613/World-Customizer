@@ -85,7 +85,7 @@ internal class OptionBar : FocusableUIElement, IRenderable {
     }
     public void OpenBackgroundColorSelector(Button _) {
         Utils.DebugLog("Clicked the background color selector button");
-        ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), new Vector2(300, 300), parent);
+        ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), new Vector2(300, 315), parent);
         parent.AddChild(colorSelector);
     }
     internal void ToggleLayer(Button button) {
@@ -227,6 +227,9 @@ class ColorSelector : Draggable {
         rSlider.Render(window, renderer);
         gSlider.Render(window, renderer);
         bSlider.Render(window, renderer);
+        Utils.WriteText(renderer, window, Math.Round(rSlider.value).ToString(), Utils.currentFont, rSlider.Position.X+25, rSlider.Position.Y+25, 16);
+        Utils.WriteText(renderer, window, Math.Round(gSlider.value).ToString(), Utils.currentFont, gSlider.Position.X+25, gSlider.Position.Y+25, 16);
+        Utils.WriteText(renderer, window, Math.Round(bSlider.value).ToString(), Utils.currentFont, bSlider.Position.X+25, bSlider.Position.Y+25, 16);
         applyButton.Render(window, renderer);
         closeButton.Render(window, renderer);
         Utils.DrawGeometryWithVertices(renderer, Position + new Vector2(size.X/2, RAD+RAD/2), verticies.ToArray());
@@ -545,13 +548,20 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     public virtual void Update() {
         try {
             if (elementToFocus != null) {
+                if (currentlyFocusedObject is WorldRenderer worldRenderer && elementToFocus != worldRenderer) {
+                    worldRenderer.dragged = false;
+                }
                 currentlyFocusedObject = elementToFocus;
                 elementToFocus = null;
             }
             // Utils.DebugLog(currentlyFocusedObject?.GetType()?.ToString() ?? "null");
+            // The world renderer should be updated first so that it does not steal focus from any other objects
             worldRenderer?.Update();
             for (int i = 0; i < updatables.Count; i++) {
                 updatables[i].Update();
+            }
+            if (parentProgram.currentWorld != null) {
+                SDL.SDL_SetWindowTitle(window, "World Customizer (" + parentProgram.currentWorld.acronym.ToUpper() + ")");
             }
         } catch (Exception err) {
             Utils.DebugLog(err);

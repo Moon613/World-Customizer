@@ -113,6 +113,9 @@ internal class Program {
                                 windows[i].Close();
                             }
                         }
+                        if (windows.Count == 0) {
+                            running = false;
+                        }
                     }
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEWHEEL:

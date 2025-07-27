@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Numerics;
 using SDL2;
 
@@ -68,6 +70,12 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     /// </summary>
     public Vector2 dragPosition;
     RoomData? currentlyHoveredRoom;
+    IntPtr cutTexture;
+    Vector2 scaledMousePos {get {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        SDL.SDL_GetWindowSize(GetParentWindow().window, out int w, out int h);
+        return (size / new Vector2(w, h)) * new Vector2(mouseX, mouseY) + Position;
+    }}
     private WorldData? WorldData { get { return GetParentWindow().parentProgram.currentWorld; }}
     public WorldRenderer(Vector2 position, Vector2 size, GenericUIElement parent, IntPtr renderer) : base(position, size, parent) {
         zoom = 1;
@@ -80,6 +88,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         finalTexture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
+        cutTexture = SDL_image.IMG_LoadTexture(renderer, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "textures" + Path.DirectorySeparatorChar + "cut.png");
         SDL.SDL_SetTextureBlendMode(layer1Texture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
         SDL.SDL_SetTextureBlendMode(layer2Texture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
         SDL.SDL_SetTextureBlendMode(layer3Texture, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
@@ -90,6 +99,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         SDL.SDL_DestroyTexture(layer2Texture);
         SDL.SDL_DestroyTexture(layer3Texture);
         SDL.SDL_DestroyTexture(finalTexture);
+        SDL.SDL_DestroyTexture(cutTexture);
     }
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
@@ -144,10 +154,6 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         if (GetParentWindow().currentlyFocusedObject != this) {
             return;
         }
-        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        Vector2 mousePos = new Vector2(mouseX, mouseY);
-        SDL.SDL_GetWindowSize(GetParentWindow().window, out int w, out int h);
-        Vector2 currentWindowSize = new Vector2(w, h);
         float scrollY = GetParentWindow().parentProgram.scrollY;
         
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
@@ -162,9 +168,6 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                 size -= (int)scrollY * new Vector2(64, 36);
             }
         }
-
-        Vector2 scaledMousePos = (size / currentWindowSize) * mousePos + Position;
-        Utils.DebugLog($"{dragged}\n{mousePos} - {relativeToMouse} = {mousePos-relativeToMouse} OR {dragPosition}\n{currentWindowSize}, {size}, {scaledMousePos}");
         
         if (GetParentWindow().IsFocused) {
             // This is used to report if the mouse is currently over a room on the current frame, so that it is not immediantly de-selected when
@@ -228,7 +231,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         else if (room.layer == Layers.Layer2) {
             SDL.SDL_SetRenderTarget(renderer, layer2Texture);
-            SDL.SDL_SetRenderDrawColor(renderer,bkgFillModifier, 255,bkgFillModifier, 255);
+            SDL.SDL_SetRenderDrawColor(renderer,bkgFillModifier, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, 255);
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
@@ -236,14 +239,41 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         else if (room.layer == Layers.Layer3) {
             SDL.SDL_SetRenderTarget(renderer, layer3Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, 255, bkgFillModifier, bkgFillModifier, 255);
+            SDL.SDL_SetRenderDrawColor(renderer, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, bkgFillModifier, 255);
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
             SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
+        for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
+            try {
+                if (room.roomConnections[i] == "DISCONNECTED" || room.roomConnections[i].Contains("GATE")) {
+                    continue;
+                }
+                RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
+                
+                int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
+                Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
+                Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
+
+                SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, connectionInOtherRoomPosition.X, connectionInOtherRoomPosition.Y);
+
+                Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
+                if (IsLayerInteractible(room.layer) && scaledMousePos.X >= centerPoint.X-10 && scaledMousePos.X <= centerPoint.X+10 && scaledMousePos.Y >= centerPoint.Y-10 && scaledMousePos.Y <= centerPoint.Y+10) {
+                    var rect = new SDL.SDL_FRect(){x=centerPoint.X-10, y=centerPoint.Y-10, w=20, h=20};
+                    SDL.SDL_RenderCopyF(renderer, cutTexture, (IntPtr)null, ref rect);
+                    if (GetParentWindow().parentProgram.clicked) {
+                        room.roomConnections[i] = "DISCONNECTED";
+                        connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
+                    }
+                }
+            } catch (Exception err) {
+                Utils.DebugLog($"There was an error with connection {i} ({room.roomConnections[i]}) in room {room.name}");
+                Utils.DebugLog(err + "\n");
+            }
+        }
         Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
-        foreach (var con in room.roomConnections) {
+        foreach (var con in room.roomConnectionPositions) {
             Utils.DrawGeometryWithVertices(renderer, con+dragPosition+room.devPosition*0.5f, circle.ToArray());
         }
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);
