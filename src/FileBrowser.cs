@@ -63,7 +63,7 @@ class FileBrowser : WindowRenderCombo {
         if (selected != null) {
             parentProgram.folderToLoadFrom = currentParentDir + Path.DirectorySeparatorChar + selected.text;
         }
-        Utils.DebugLog(parentProgram.folderToLoadFrom);
+        Utils.DebugLog(parentProgram?.folderToLoadFrom ?? "");
         Close();
     }
     public void Quit(Button _) {

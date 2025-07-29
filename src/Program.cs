@@ -75,9 +75,8 @@ internal class Program {
         }
 
         windows = new List<WindowRenderCombo>();
-        WindowRenderCombo mainWindow = new WindowRenderCombo(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
+        MainWindow mainWindow = new MainWindow(new Vector2(0, 0), Vector2.Zero, this, "World Customizer", SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL.SDL_WindowFlags.SDL_WINDOW_MAXIMIZED | SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
         windows.Add(mainWindow);
-        mainWindow.worldRenderer = new WorldRenderer(Vector2.Zero, mainWindow.size, mainWindow, mainWindow.renderer);
         OptionBar optionBar = new OptionBar(new Vector2(mainWindow.size.X, 32), mainWindow);
         mainWindow.AddChild(optionBar);
         optionBar.AssignButtons(Button.CreateButtonsHorizontal(new List<Tuple<string, Action<Button>>>{
@@ -141,12 +140,11 @@ internal class Program {
                 Utils.DebugLog(room.ToString());
             }
             folderToLoadFrom = null;
-            windows[0].worldRenderer.dragPosition = windows[0].size*0.5f;
+            ((MainWindow)windows[0]).worldRenderer.dragPosition = windows[0].size*0.5f;
         }
-        windows.Last().Update();
-        // for (int i = 0; i < windows.Count; i++) {
-        //     windows[i].Update();
-        // }
+        for (int i = 0; i < windows.Count; i++) {
+            windows[i].Update();
+        }
     }
     /// <summary>
     /// Renders all windows.
@@ -164,7 +162,8 @@ internal class Program {
         foreach (WindowRenderCombo window in windows) {
             SDL.SDL_DestroyRenderer(window.renderer);
             SDL.SDL_DestroyWindow(window.window);
-            window.worldRenderer?.Destroy();
+            if (window is MainWindow mainWindow)
+            mainWindow.worldRenderer.Destroy();
         }
         currentWorld?.Destroy();
         SDL_ttf.TTF_CloseFont(Utils.currentFont);

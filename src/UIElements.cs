@@ -15,15 +15,15 @@ namespace WorldCustomizer;
 internal class OptionBar : FocusableUIElement, IRenderable {
     List<Button>? options;
     ContextMenu? contextMenu;
-    new WindowRenderCombo parent;
-    internal OptionBar(Vector2 size, WindowRenderCombo parent) : base(Vector2.Zero, size, parent) {
+    new MainWindow parent;
+    internal OptionBar(Vector2 size, MainWindow parent) : base(Vector2.Zero, size, parent) {
         this.parent = parent;
         contextMenu = null;
     }
     internal void AssignButtons(List<Button> buttons) {
         options = buttons;
     }
-    internal override WindowRenderCombo GetParentWindow() {
+    internal new MainWindow GetParentWindow() {
         return parent.GetParentWindow();
     }
     public void Render(IntPtr window, IntPtr renderer) {        
@@ -89,14 +89,14 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         parent.AddChild(colorSelector);
     }
     internal void ToggleLayer(Button button) {
-        if (button.text == "Layer 1") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer1;
+        if (button.text == "Layer 1" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer1) {
+            worldRenderer1.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer1;
         }
-        if (button.text == "Layer 2") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer2;
+        if (button.text == "Layer 2" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer2) {
+            worldRenderer2.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer2;
         }
-        if (button.text == "Layer 3") {
-            GetParentWindow().worldRenderer.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer3;
+        if (button.text == "Layer 3" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer3) {
+            worldRenderer3.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer3;
         }
     }
 }
@@ -165,12 +165,14 @@ class ColorSelector : Draggable {
     readonly ColorBox colorBox;
     new internal WindowRenderCombo parent;
     const int RAD = 60;
+    readonly ColorBox oldColor;
     internal ColorSelector(Vector2 position, Vector2 size, WindowRenderCombo parent) : base (position, size, parent) {
         this.parent = parent;
         rSlider = new Slider(new Vector2(20, 270), new Vector2(73, 20), this, 0, 255, true);
         gSlider = new Slider(new Vector2(113, 270), new Vector2(73, 20), this, 0, 255, true);
         bSlider = new Slider(new Vector2(206, 270), new Vector2(73, 20), this, 0, 255, true);
-        this.colorBox = new ColorBox(new Vector2(size.X/2-60, size.Y*0.6f), new Vector2(120, 30), this, new SDL.SDL_Color());
+        this.colorBox = new ColorBox(new Vector2(size.X/2, size.Y*0.6f), new Vector2(60, 30), this, parent.backgroundColor);
+        this.oldColor = new ColorBox(new Vector2(size.X/2-60, size.Y*0.6f), new Vector2(60, 30), this, parent.backgroundColor);
         applyButton = new Button("Apply", this, new Vector2(107, 240), 48, 19, 16, new Vector2(18, 2), true, ApplyColorToParentWindow);
         closeButton = new Button("X", this, new Vector2(273, 5), 12, 20, 22, new Vector2(5, 5), true, Close);
         
@@ -205,6 +207,7 @@ class ColorSelector : Draggable {
     }
     public void ApplyColorToParentWindow(Button _) {
         parent.backgroundColor = new SDL.SDL_Color(){r=(byte)rSlider.value, g=(byte)gSlider.value, b=(byte)bSlider.value, a=255};
+        oldColor.color = parent.backgroundColor;
     }
     public void Close(Button _) {
         parent.RemoveChild(this);
@@ -221,6 +224,7 @@ class ColorSelector : Draggable {
         colorBox.color.b = (byte)bSlider.value;
         colorBox.color.a = 255;
         colorBox.Render(window, renderer);
+        oldColor.Render(window, renderer);
 
         SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL.SDL_RenderDrawRectF(renderer, ref r);
@@ -454,16 +458,13 @@ class ButtonWithImage : Button {
         SDL.SDL_DestroyTexture(texture);
     }
 }
-class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
+internal class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     internal readonly List<IRenderable> renderables;
     internal readonly List<IAmInteractable> updatables;
     internal SDL.SDL_Color backgroundColor;
     internal Program parentProgram;
     internal IntPtr window;
     internal IntPtr renderer;
-    internal WorldRenderer? worldRenderer;
-    internal FocusableUIElement? currentlyFocusedObject;
-    internal FocusableUIElement? elementToFocus;
     internal bool IsFocused => ((SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS) | (SDL.SDL_GetWindowFlags(window) & (int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS)) == ((int)SDL.SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS | (int)SDL.SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS);
     internal WindowRenderCombo(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, null) {
         // Create a new window given a title, size, and passes it a flag indicating it should be shown.
@@ -489,8 +490,6 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         this.renderables = new List<IRenderable>();
         this.updatables = new List<IAmInteractable>();
         this.backgroundColor = new SDL.SDL_Color(){r=8, g=38, b=82, a=255};
-        this.currentlyFocusedObject = null;
-        this.elementToFocus = null;
     }
     public void AddChild(GenericUIElement child) {
         if (child is IRenderable renderable) {
@@ -527,15 +526,7 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
         SDL.SDL_RenderPresent(renderer);
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {
-        SDL.SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
-        for (int i = 25; i < size.X; i+=50) {
-            SDL.SDL_RenderDrawLineF(renderer, i, 0, i, size.Y);
-        }
-        for (int i = 25; i < size.Y; i+=50) {
-            SDL.SDL_RenderDrawLineF(renderer, 0, i, size.X, i);
-        }
         try {
-            worldRenderer?.Render(window, renderer);
             for (int i = 0; i < renderables.Count; i++) {
                 renderables[i].Render(window, renderer);
             }
@@ -546,28 +537,50 @@ class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {
     public void Signal(string text) {
     }
     public virtual void Update() {
-        try {
-            if (elementToFocus != null) {
-                if (currentlyFocusedObject is WorldRenderer worldRenderer && elementToFocus != worldRenderer) {
-                    worldRenderer.dragged = false;
-                }
-                currentlyFocusedObject = elementToFocus;
-                elementToFocus = null;
-            }
-            // Utils.DebugLog(currentlyFocusedObject?.GetType()?.ToString() ?? "null");
-            // The world renderer should be updated first so that it does not steal focus from any other objects
-            worldRenderer?.Update();
-            for (int i = 0; i < updatables.Count; i++) {
-                updatables[i].Update();
-            }
-            if (parentProgram.currentWorld != null) {
-                SDL.SDL_SetWindowTitle(window, "World Customizer (" + parentProgram.currentWorld.acronym.ToUpper() + ")");
-            }
-        } catch (Exception err) {
-            Utils.DebugLog(err);
+        for (int i = 0; i < updatables.Count; i++) {
+            updatables[i].Update();
         }
     }
     internal override WindowRenderCombo GetParentWindow() {
+        return this;
+    }
+}
+class MainWindow : WindowRenderCombo {
+    internal WorldRenderer worldRenderer;
+    internal FocusableUIElement? currentlyFocusedObject;
+    internal FocusableUIElement? elementToFocus;
+    internal MainWindow(Vector2 position, Vector2 size, Program parentProgram, string title, SDL.SDL_WindowFlags windowFlags) : base(position, size, parentProgram, title, windowFlags) {
+        worldRenderer = new WorldRenderer(Vector2.Zero, this.size, this, renderer);
+        this.currentlyFocusedObject = null;
+        this.elementToFocus = null;
+    }
+    public override void Render(IntPtr window, IntPtr renderer) {
+        SDL.SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
+        for (int i = 25; i < size.X; i+=50) {
+            SDL.SDL_RenderDrawLineF(renderer, i, 0, i, size.Y);
+        }
+        for (int i = 25; i < size.Y; i+=50) {
+            SDL.SDL_RenderDrawLineF(renderer, 0, i, size.X, i);
+        }
+        worldRenderer.Render(window, renderer);
+        base.Render(window, renderer);
+    }
+    public override void Update() {
+        if (elementToFocus != null) {
+            if (currentlyFocusedObject is WorldRenderer worldRenderer && elementToFocus != worldRenderer) {
+                worldRenderer.dragged = false;
+            }
+            currentlyFocusedObject = elementToFocus;
+            elementToFocus = null;
+        }
+        // The world renderer should be updated first so that it does not steal focus from any other objects
+        worldRenderer.Update();
+        base.Update();
+        if (parentProgram.currentWorld != null) {
+            SDL.SDL_SetWindowTitle(window, "World Customizer (" + parentProgram.currentWorld.acronym.ToUpper() + ")");
+        }
+    }
+    internal new MainWindow GetParentWindow() {
         return this;
     }
 }

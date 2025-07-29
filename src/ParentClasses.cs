@@ -35,14 +35,17 @@ internal abstract class FocusableUIElement : GenericUIElement, IAmInteractable {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         if ((mouseX >= Position.X && mouseX <= Position.X+size.X && mouseY >= Position.Y && mouseY <= Position.Y+size.Y) 
         || (this is WorldRenderer)) {
-            GetParentWindow().elementToFocus = this;
+            GetParentMainWindow().elementToFocus = this;
         }
-        else if (GetParentWindow().currentlyFocusedObject == this) {
-            GetParentWindow().currentlyFocusedObject = null;
+        else if (GetParentMainWindow().currentlyFocusedObject == this) {
+            GetParentMainWindow().currentlyFocusedObject = null;
         }
     }
     internal override WindowRenderCombo GetParentWindow() {
         return parent.GetParentWindow();
+    }
+    internal MainWindow GetParentMainWindow() {
+        return (MainWindow)GetParentWindow();
     }
 }
 internal abstract class Draggable : FocusableUIElement, IRenderable {
@@ -60,7 +63,7 @@ internal abstract class Draggable : FocusableUIElement, IRenderable {
     }
     public override void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (GetParentWindow().IsFocused && GetParentWindow().currentlyFocusedObject == this) {
+        if (GetParentWindow().IsFocused && GetParentMainWindow().currentlyFocusedObject == this) {
             if (mouseOffset == null && GetParentWindow().parentProgram.clicked && mouseX > Position.X && mouseX < Position.X+size.X && mouseY > Position.Y && mouseY < Position.Y+Handle_Height) {
                 mouseOffset = new Vector2(mouseX, mouseY) - Position;
             }

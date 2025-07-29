@@ -15,6 +15,11 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         Layer2 = 2,
         Layer3 = 4
     }
+    public enum Slugcat {
+        Yellow,
+        White,
+        Red
+    }
     static List<SDL.SDL_Vertex> circle = [
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
@@ -156,7 +161,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     }
     public override void Update() {
         base.Update();
-        if (GetParentWindow().currentlyFocusedObject != this) {
+        if (GetParentMainWindow().currentlyFocusedObject != this) {
             return;
         }
         float scrollY = GetParentWindow().parentProgram.scrollY;
