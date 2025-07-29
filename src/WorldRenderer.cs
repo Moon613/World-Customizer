@@ -37,6 +37,23 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         new(){position=new SDL.SDL_FPoint(){x=-3, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
     ];
+    static List<SDL.SDL_Vertex> biggerCircle = [
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=6}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=6, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=6, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=-6}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=-6}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-6, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-6, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=0, y=6}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
+    ];
     public int zoom;
     public bool dragged;
     /// <summary>
@@ -313,6 +330,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             }
             // If the room connection is being formed by the user, the other end of the connection should be at the mouse position.
             else if (room.name.ToUpper() == currentlyEditingNodeSourceRoom && i == grabbedConnectionIndex) {
+                Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, biggerCircle.ToArray());
                 SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, scaledMousePos.X, scaledMousePos.Y);
                 continue;
             }
@@ -331,11 +349,17 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     SDL.SDL_RenderCopyF(renderer, cutTexture, (IntPtr)null, ref rect);
                 }
             }
+
+            // Drawing the white diamond over the position of the connection
+            bool hoveredOver = IsLayerInteractible(room.layer) && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6;
+            if (hoveredOver) {
+                Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, biggerCircle.ToArray());
+            }
+            else {
+                Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, circle.ToArray());
+            }
         }
         Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
-        foreach (var con in room.roomConnectionPositions) {
-            Utils.DrawGeometryWithVertices(renderer, con+dragPosition+room.devPosition*0.5f, circle.ToArray());
-        }
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);
     }
     private bool IsLayerInteractible(Layers layer) {

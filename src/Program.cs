@@ -99,11 +99,21 @@ internal class Program {
                     running = false;
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN:
-                    clicked = true;
-                    mouseDown = true;
+                    if (e.button.button == SDL.SDL_BUTTON_LEFT || e.button.button == SDL.SDL_BUTTON_MIDDLE) {
+                        clicked = true;
+                        mouseDown = true;
+                    }
+                    else if (e.button.button == SDL.SDL_BUTTON_RIGHT) {
+
+                    }
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:
-                    mouseDown = false;
+                    if (e.button.button == SDL.SDL_BUTTON_LEFT || e.button.button == SDL.SDL_BUTTON_MIDDLE) {
+                        mouseDown = false;
+                    }
+                    else if (e.button.button == SDL.SDL_BUTTON_RIGHT) {
+                        
+                    }
                     break;
                 case SDL.SDL_EventType.SDL_WINDOWEVENT:
                     if (e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_CLOSE) {
