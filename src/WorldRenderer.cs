@@ -39,7 +39,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     /// </summary>
     public Layers currentlyFocusedLayers;
     /// <summary>
-    /// Used when dragging the world around, so that it stays relative to the mouse when moving.
+    /// Used when dragging the world view and rooms around, so that it stays relative to the mouse when moving.
     /// </summary>
     public Vector2 relativeToMouse;
     /// <summary>
@@ -69,8 +69,11 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     /// so that the rooms can move without effecting the position of the world renderer.
     /// </summary>
     public Vector2 dragPosition;
-    RoomData? currentlyHoveredRoom;
-    IntPtr cutTexture;
+    public RoomData? currentlyHoveredRoom;
+    public IntPtr cutTexture;
+    public string? currentlyEditingNodeSourceRoom;
+    public int grabbedConnectionIndex = 0;
+    public readonly List<string[]> prepareToCutConnections;
     Vector2 scaledMousePos {get {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         SDL.SDL_GetWindowSize(GetParentWindow().window, out int w, out int h);
@@ -84,6 +87,8 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         originalSize = size;
         dragPosition = Vector2.Zero;
         currentlyHoveredRoom = null;
+        prepareToCutConnections = new List<string[]>();
+        currentlyEditingNodeSourceRoom = null;
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
@@ -155,6 +160,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             return;
         }
         float scrollY = GetParentWindow().parentProgram.scrollY;
+        prepareToCutConnections.Clear();
         
         // Checks that a zoom is actually happening and that it will not make the world dissappear.
         if (!dragged && scrollY != 0 && (int)scrollY+zoom >= 1 && (int)scrollY+zoom <= 20) {
@@ -176,9 +182,58 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             if (WorldData != null) {
                 foreach (RoomData room in WorldData.roomData) {
                     Vector2 roomPosition = dragPosition + room.devPosition*0.5f;
-                    if (!dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X && scaledMousePos.X < roomPosition.X+room.size.X && scaledMousePos.Y > roomPosition.Y && scaledMousePos.Y < roomPosition.Y+room.size.Y && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
+                    if (currentlyEditingNodeSourceRoom == null && !dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X && scaledMousePos.X < roomPosition.X+room.size.X && scaledMousePos.Y > roomPosition.Y && scaledMousePos.Y < roomPosition.Y+room.size.Y && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
                         currentlyHoveredRoom = room;
                         mouseOverRoom = true;
+                    }
+
+                    for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
+                        Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
+                        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6;
+                        // Gates break a lot rn so don't use them.
+                        if (room.roomConnections[i].Contains("GATE")) {
+                            continue;
+                        }
+                        // This skips logic that would break if a connection is disconnected, without having to do extra math.
+                        else if (room.roomConnections[i] == "DISCONNECTED") {
+                            goto ThisConnectionIsDisconnected;
+                        }
+                        
+                        RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
+                        int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
+                        Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
+
+                        // This code is for cutting a room connection
+                        Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
+                        if (IsLayerInteractible(room.layer) && scaledMousePos.X >= centerPoint.X-10 && scaledMousePos.X <= centerPoint.X+10 && scaledMousePos.Y >= centerPoint.Y-10 && scaledMousePos.Y <= centerPoint.Y+10) {
+                            if (GetParentWindow().parentProgram.clicked) {
+                                room.roomConnections[i] = "DISCONNECTED";
+                                connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
+                            }
+                            else {
+                                prepareToCutConnections.Add([room.roomConnections[i], connectedRoom.roomConnections[indexInConnectedRoomConList]]);
+                            }
+                        }
+
+                        // If the node was clicked on and is connected, disconnect the other end.
+                        if (clickedOnNode) {
+                            connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
+                        }
+                        ThisConnectionIsDisconnected:
+                        if (clickedOnNode) {
+                            if (currentlyEditingNodeSourceRoom == null) {
+                                currentlyHoveredRoom = null;
+                                room.roomConnections[i] = "DISCONNECTED";
+                                currentlyEditingNodeSourceRoom = room.name.ToUpper();
+                                grabbedConnectionIndex = i;
+                            }
+                            else if (room.name.ToUpper() != currentlyEditingNodeSourceRoom) {
+                                room.roomConnections[i] = currentlyEditingNodeSourceRoom;
+                                WorldData.roomData.First(x => x.name.ToUpper() == currentlyEditingNodeSourceRoom).roomConnections[grabbedConnectionIndex] = room.name.ToUpper();
+                                currentlyEditingNodeSourceRoom = null;
+                                grabbedConnectionIndex = 0;
+                            }
+                        }
                     }
                 }
             }
@@ -246,30 +301,30 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
         for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
-            try {
-                if (room.roomConnections[i] == "DISCONNECTED" || room.roomConnections[i].Contains("GATE")) {
-                    continue;
-                }
-                RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
-                
-                int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
-                Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
-                Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
+            Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
+            // Gates break a lot rn so don't use them.
+            if (room.roomConnections[i].Contains("GATE")) {
+                continue;
+            }
+            // If the room connection is being formed by the user, the other end of the connection should be at the mouse position.
+            else if (room.name.ToUpper() == currentlyEditingNodeSourceRoom && i == grabbedConnectionIndex) {
+                SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, scaledMousePos.X, scaledMousePos.Y);
+                continue;
+            }
 
+            if (room.roomConnections[i] != "DISCONNECTED") {
+                RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
+                int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
+                Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
+                
                 SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, connectionInOtherRoomPosition.X, connectionInOtherRoomPosition.Y);
 
+                // This code is for cutting a room connection
                 Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
-                if (IsLayerInteractible(room.layer) && scaledMousePos.X >= centerPoint.X-10 && scaledMousePos.X <= centerPoint.X+10 && scaledMousePos.Y >= centerPoint.Y-10 && scaledMousePos.Y <= centerPoint.Y+10) {
+                if (prepareToCutConnections.FirstOrDefault(x => x[0] == room.roomConnections[i] && x[1] == connectedRoom.roomConnections[indexInConnectedRoomConList]) != default) {
                     var rect = new SDL.SDL_FRect(){x=centerPoint.X-10, y=centerPoint.Y-10, w=20, h=20};
                     SDL.SDL_RenderCopyF(renderer, cutTexture, (IntPtr)null, ref rect);
-                    if (GetParentWindow().parentProgram.clicked) {
-                        room.roomConnections[i] = "DISCONNECTED";
-                        connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
-                    }
                 }
-            } catch (Exception err) {
-                Utils.DebugLog($"There was an error with connection {i} ({room.roomConnections[i]}) in room {room.name}");
-                Utils.DebugLog(err + "\n");
             }
         }
         Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
