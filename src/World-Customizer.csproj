@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     
     <PropertyGroup>
-        <TargetFramework>net48</TargetFramework>
+        <TargetFramework>net80</TargetFramework>
         <LangVersion>Latest</LangVersion>
         <PathMap>$(MSBuildProjectDirectory)=/World-Customizer</PathMap>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
