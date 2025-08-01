@@ -12,6 +12,7 @@ namespace WorldCustomizer;
 public static class Utils {
     public static IntPtr currentFont;
     public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
+    public static string[] registeredSlugcats = File.ReadAllLines(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "slugcats.txt");
     internal static WorldRenderer.Layers ByteToLayer(byte l) {
         WorldRenderer.Layers layer = l switch
         {

@@ -61,7 +61,6 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         #pragma warning disable CS8604, IDE0090, IDE0028
         contextMenu = new ContextMenu(new Vector2(0, 32), this);
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
-            new Tuple<string, Action<Button>>("File", new Action<Button>(_ => {Utils.DebugLog("Clicked the File button");})),
             new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save button");})),
             new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save As button");})),
             new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Utils.DebugLog("Clicked on the New button");})),
@@ -79,15 +78,22 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         contextMenu = new ContextMenu(new Vector2(42, 32), this);
 
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
-            new Tuple<string, Action<Button>>("Background Color", OpenBackgroundColorSelector)
+            new Tuple<string, Action<Button>>("Background Color", OpenBackgroundColorSelector),
+            new Tuple<string, Action<Button>>("Slugcat Selector", OpenSlugcatSelection)
         }, contextMenu, new Vector2(0, 0), 14, 5, 2);
 
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
     }
     public void OpenBackgroundColorSelector(Button _) {
         Utils.DebugLog("Clicked the background color selector button");
-        ColorSelector colorSelector = new ColorSelector(new Vector2(200, 200), new Vector2(300, 315), parent);
+        ColorSelector colorSelector = new ColorSelector(parent.size/2 - new Vector2(150, 157.5f), new Vector2(300, 315), parent);
         parent.AddChild(colorSelector);
+    }
+    public void OpenSlugcatSelection(Button _) {
+        Utils.DebugLog("Opened the Slugcat Selection Menu");
+        string[] slugcats = Utils.registeredSlugcats;
+        SlugcatSelector slugcatSelector = new SlugcatSelector(parent.size/2 - new Vector2(85, (40+((slugcats.Length/3)+1)*50)/2), new Vector2(160, 40+((slugcats.Length/3)+1)*50), parent, slugcats);
+        parent.AddChild(slugcatSelector);
     }
     internal void ToggleLayer(Button button) {
         if (button.text == "Layer 1" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer1) {
@@ -99,6 +105,37 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         if (button.text == "Layer 3" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer3) {
             worldRenderer3.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer3;
         }
+    }
+}
+class SlugcatSelector : Draggable, IRenderable {
+    readonly List<ButtonWithImage> slugcatButtons;
+    public SlugcatSelector(Vector2 position, Vector2 size, GenericUIElement parent, string[] slugcats) : base(position, size, parent) {
+        slugcatButtons = new();
+        for (int i = 0; i < slugcats.Length; i++) {
+            slugcatButtons.Add(new ButtonWithImage(slugcats[i], slugcats[i]+".png", new Vector2(40), 0, this, new Vector2(10+(i*50)%150, 40+(i/3)*50), 40, 40, 0, new Vector2(-40, 0), true, SetSlugcat));
+        }
+    }
+    public override void Render(IntPtr window, IntPtr renderer) {
+        base.Render(window, renderer);
+        foreach (ButtonWithImage button in slugcatButtons) {
+            if (button.text == GetParentMainWindow().worldRenderer.selectedSlugcat) {
+                var rect = new SDL.SDL_FRect(){x=button.Position.X, y=button.Position.Y, w=button.size.X, h=button.size.Y};
+                SDL.SDL_SetRenderDrawColor(renderer, 39, 150, 214, alpha);
+                SDL.SDL_RenderFillRectF(renderer, ref rect);
+            }
+            button.Render(window, renderer);
+        }
+    }
+    public override void Update() {
+        base.Update();
+        if (GetParentWindow().IsFocused && GetParentMainWindow().currentlyFocusedObject == this) {
+            foreach (ButtonWithImage button in slugcatButtons) {
+                button.Update();
+            }
+        }
+    }
+    public void SetSlugcat(Button button) {
+        GetParentMainWindow().worldRenderer.selectedSlugcat = button.text;
     }
 }
 /// <summary>
@@ -161,7 +198,6 @@ class ContextMenu : FocusableUIElement, IRenderable {
 class ColorSelector : Draggable {
     readonly Slider rSlider, gSlider, bSlider;
     readonly Button applyButton;
-    readonly Button closeButton;
     readonly List<SDL.SDL_Vertex> verticies;
     readonly ColorBox colorBox;
     new internal WindowRenderCombo parent;
@@ -175,7 +211,6 @@ class ColorSelector : Draggable {
         this.colorBox = new ColorBox(new Vector2(size.X/2, size.Y*0.6f), new Vector2(60, 30), this, parent.backgroundColor);
         this.oldColor = new ColorBox(new Vector2(size.X/2-60, size.Y*0.6f), new Vector2(60, 30), this, parent.backgroundColor);
         applyButton = new Button("Apply", this, new Vector2(107, 240), 48, 19, 16, new Vector2(18, 2), true, ApplyColorToParentWindow);
-        closeButton = new Button("X", this, new Vector2(273, 5), 12, 20, 22, new Vector2(5, 5), true, Close);
         
         float horizontalPosDist = RAD;
         float verticalPosDist = 0.5f*RAD;
@@ -210,25 +245,16 @@ class ColorSelector : Draggable {
         parent.backgroundColor = new SDL.SDL_Color(){r=(byte)rSlider.value, g=(byte)gSlider.value, b=(byte)bSlider.value, a=255};
         oldColor.color = parent.backgroundColor;
     }
-    public void Close(Button _) {
-        parent.RemoveChild(this);
-    }
-    public override void Render(IntPtr window, IntPtr renderer) {
-        SDL.SDL_SetRenderDrawColor(renderer, 122, 122, 122, 255);
-        var r = new SDL.SDL_FRect(){x=Position.X, y=Position.Y, w=size.X, h=size.Y};
-        SDL.SDL_RenderFillRectF(renderer, ref r);
-        
+    public override void Render(IntPtr window, IntPtr renderer) {        
         base.Render(window, renderer);
 
         colorBox.color.r = (byte)rSlider.value;
         colorBox.color.g = (byte)gSlider.value;
         colorBox.color.b = (byte)bSlider.value;
-        colorBox.color.a = 255;
+        colorBox.color.a = alpha;
         colorBox.Render(window, renderer);
         oldColor.Render(window, renderer);
 
-        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL.SDL_RenderDrawRectF(renderer, ref r);
         rSlider.Render(window, renderer);
         gSlider.Render(window, renderer);
         bSlider.Render(window, renderer);
@@ -236,7 +262,6 @@ class ColorSelector : Draggable {
         Utils.WriteText(renderer, window, Math.Round(gSlider.value).ToString(), Utils.currentFont, gSlider.Position.X+25, gSlider.Position.Y+25, 16);
         Utils.WriteText(renderer, window, Math.Round(bSlider.value).ToString(), Utils.currentFont, bSlider.Position.X+25, bSlider.Position.Y+25, 16);
         applyButton.Render(window, renderer);
-        closeButton.Render(window, renderer);
         Utils.DrawGeometryWithVertices(renderer, Position + new Vector2(size.X/2, RAD+RAD/2), verticies.ToArray());
         Vector2 calculated = new Vector2(0, -RAD)*(rSlider.value/255)
             + new Vector2(RAD, 0)*(gSlider.value/255)
@@ -246,22 +271,20 @@ class ColorSelector : Draggable {
         // Change the color of the center of the hexagon to show white/black
         byte blackWhiteVal = (byte)(0.2f*rSlider.value + 0.7f*gSlider.value + 0.1f*bSlider.value);
         for (int i = 2; i < verticies.Count; i += 3) {
-            verticies[i] = verticies[i] with {color=new(){r=blackWhiteVal, g=blackWhiteVal, b=blackWhiteVal, a=255}};
+            verticies[i] = verticies[i] with {color=new(){r=blackWhiteVal, g=blackWhiteVal, b=blackWhiteVal, a=alpha}};
         }
 
-        SDL.SDL_SetRenderDrawColor(renderer, (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), 255);
+        SDL.SDL_SetRenderDrawColor(renderer, (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), (byte)(255-blackWhiteVal), alpha);
         SDL.SDL_RenderDrawLineF(renderer, Position.X + size.X/2, Position.Y+RAD+RAD/2, calculated.X, calculated.Y);
-        
-        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL.SDL_RenderDrawRectF(renderer, ref r);
     }
     public override void Update() {
         base.Update();
-        rSlider.Update();
-        gSlider.Update();
-        bSlider.Update();
-        applyButton.Update();
-        closeButton.Update();
+        if (GetParentWindow().IsFocused && GetParentMainWindow().currentlyFocusedObject == this) {
+            rSlider.Update();
+            gSlider.Update();
+            bSlider.Update();
+            applyButton.Update();
+        }
     }
 }
 class Slider : GenericUIElement, IRenderable, IAmInteractable {
@@ -373,7 +396,7 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         var r = new SDL.SDL_FRect() {x = Position.X, y = Position.Y, w = size.X, h = size.Y};
         
-        if (GetParentWindow().IsFocused && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+        if (GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
             SDL.SDL_RenderFillRectF(renderer, ref r);
         }
