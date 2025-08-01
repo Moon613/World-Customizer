@@ -175,7 +175,7 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
     public void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         // Prevent lag by not rendering if it won't be seen anyway.
-        if (Position.Y > parent.size.Y || Position.Y < -size.Y) {
+        if (Position.Y > parent!.size.Y || Position.Y < -size.Y) {
             return;
         }
 
@@ -220,6 +220,6 @@ class FileBrowserCheckButton : GenericUIElement, IRenderable, IAmInteractable {
         }
     }
     internal override WindowRenderCombo GetParentWindow() {
-        return parent.GetParentWindow();
+        return parent!.GetParentWindow();
     }
 }

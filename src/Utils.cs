@@ -73,7 +73,7 @@ public static class Utils {
         for (int i = 0; i < verticies.Length; i++) {
             verticies[i].position = new SDL.SDL_FPoint(){x=verticies[i].position.x+center.X, y=verticies[i].position.y+center.Y};
         }
-        SDL.SDL_RenderGeometry(renderer, (IntPtr)null, verticies, verticies.Length, null, 0);
+        SDL.SDL_RenderGeometry(renderer, (IntPtr)null, verticies, verticies.Length, null!, 0);
     }
     /// <summary>
     /// Draws text to the screen, given a string and font, and has optional parameters for position, size, and text foreground color.<br />

@@ -336,7 +336,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             }
 
             if (room.roomConnections[i] != "DISCONNECTED") {
-                RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
+                RoomData connectedRoom = WorldData!.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
                 int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
                 Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
                 

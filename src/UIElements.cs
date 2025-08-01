@@ -19,6 +19,7 @@ internal class OptionBar : FocusableUIElement, IRenderable {
     internal OptionBar(Vector2 size, MainWindow parent) : base(Vector2.Zero, size, parent) {
         this.parent = parent;
         contextMenu = null;
+        options = null;
     }
     internal void AssignButtons(List<Button> buttons) {
         options = buttons;
@@ -32,7 +33,7 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         var rect = new SDL.SDL_FRect() {x = 0, y = 0, w = size.X, h = size.Y};
         SDL.SDL_RenderFillRectF(renderer, ref rect);
 
-        foreach (Button opt in options) {
+        foreach (Button opt in options!) {
             opt.Render(window, renderer);
         }
 
@@ -46,7 +47,7 @@ internal class OptionBar : FocusableUIElement, IRenderable {
     public override void Update() {
         base.Update();
         contextMenu?.Update();
-        foreach (Button button in options) {
+        foreach (Button button in options!) {
             button.Update();
         }
     }
@@ -129,7 +130,7 @@ class ContextMenu : FocusableUIElement, IRenderable {
         SDL.SDL_RenderFillRectF(renderer, ref rect);
 
         // Draw each of the options
-        foreach (Button opt in options) {
+        foreach (Button opt in options!) {
             opt.Render(window, renderer);
         }
     }
@@ -147,7 +148,7 @@ class ContextMenu : FocusableUIElement, IRenderable {
         if (mouseX < Position.X-30 || mouseX > Position.X+size.X+30 || mouseY < Position.Y-30 || mouseY > Position.Y+size.Y+30) {
             focused = true;
         }
-        foreach(Button button in options) {
+        foreach(Button button in options!) {
             button.Update();
         }
     }
@@ -330,7 +331,7 @@ class Slider : GenericUIElement, IRenderable, IAmInteractable {
         }
     }
     internal override WindowRenderCombo GetParentWindow(){
-        return parent.GetParentWindow();
+        return parent!.GetParentWindow();
     }
 }
 class ColorBox : GenericUIElement, IRenderable {
@@ -347,7 +348,7 @@ class ColorBox : GenericUIElement, IRenderable {
         SDL.SDL_RenderDrawRectF(renderer, ref rect);
     }
     internal override WindowRenderCombo GetParentWindow() {
-        return parent.GetParentWindow();
+        return parent!.GetParentWindow();
     }
 }
 class Button : GenericUIElement, IRenderable, IAmInteractable {
