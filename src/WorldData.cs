@@ -71,6 +71,8 @@ unsafe class RoomData {
     public IntPtr roomSurface;
     public List<Vector2> roomConnectionPositions;
     public List<string> roomConnections;
+    public List<Vector2> creatureSpawnPositions;
+    public List<SpawnData> creatureSpawnData;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
@@ -111,6 +113,7 @@ unsafe class RoomData {
         }
 
         roomConnectionPositions = new();
+        creatureSpawnPositions = new();
         // We have the minimum needs to create the room surface, so we make the default now and fill it with useful pixels in the next part.
         // Also here be endianness
         roomSurface = SDL.SDL_CreateRGBSurface(0, (int)size.X, (int)size.Y, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
@@ -125,6 +128,11 @@ unsafe class RoomData {
                         color.r = 0;
                         if (waterLayer == 1 && waterLayer > 0 && size.Y-j < waterLevel+2) {
                             color.b = 255;
+                        }
+                        if (singleTileData.Length >= 2 && singleTileData[1] == 5) {
+                            color.r = 255;
+                            color.g = 255;
+                            creatureSpawnPositions.Add(new Vector2(i, j));
                         }
                         if (singleTileData.Length >= 2 && singleTileData[1] == 4) {
                             color.r = 255;
@@ -151,6 +159,11 @@ unsafe class RoomData {
                             color.r = 255;
                             color.b = 255;
                             roomConnectionPositions.Add(new Vector2(i, j));
+                        }
+                        if (singleTileData[1] == 5) {
+                            color.r = 255;
+                            color.g = 255;
+                            creatureSpawnPositions.Add(new Vector2(i, j));
                         }
                     }
 
@@ -186,7 +199,169 @@ unsafe class RoomData {
             }
         }
 
-        Utils.DebugLog((devMapData ?? "") + "\n");
+        this.creatureSpawnData = new List<SpawnData>();
+        for (int i = 0; i < spawnData.Length; i++) {
+            Utils.DebugLog(spawnData[i]);
+            // A list of slugcats that spawn the creature or lineage. null value indicates it spawns for any slugcat.
+            List<string>? slugCatsThatSpawnThisCreature = null;
+            // The pipe a creature can spawn out of. Since individual lines can contain different creatures
+            // if they are not lineages, this is a list to acount for each creature. A lineage spawn will
+            // only assign one value to the list in index 0.
+            List<int> pipeNumber = new (0);
+            // Determines if this is a lineage spawn or single-type creature spawn (although those can have multiple creatures in a single line though)
+            bool isALineage = false;
+            // The creature type of non-lineage creatures.
+            List<string> critType = new ();
+            // The tags for non-lineage creatures.
+            List<string> tags = new (0);
+            // The amount of non-lineage creatures that spawn.
+            // This means that a single spawn line can spawn an arbitrary amount of the same creature, all from one den.
+            List<string> count = new (0);
+            // A list of different creature spawn data.
+            // The first field is the creature type, the second any tags it may have (none is 0), and the third the chance of progressing
+            // to the next creature in the lineage. null when the spawn data parsing detects it is not a lineage spawn.
+            List<SpawnData.CreatureData>? lineageSpawns = null;
+
+            // Extract the slugcats from the data
+            if (spawnData[i].StartsWith("(")) {
+                slugCatsThatSpawnThisCreature = new();
+
+                // The index to start the substring from in the next step, which trims the parenthesis and "X-" from around the slugcat data.
+                // It shouldn't be less than 1, thus Math.Max() is used, since if '-' is not found (indicating exclusive modifier) IndexOf()
+                // returns -1 (plus one is 0 in this case, but that still causes issues in the next Substring()).
+                int indexToStart = Math.Max(1, spawnData[i].Substring(0, spawnData[i].IndexOf(')')).IndexOf('-') + 1);
+                // Extract the slugcats by reading the substring from the begining (exluding the exclusive spawn modifier "X-"), 
+                // and spliting them with the char ','.
+                string[] slugcats = spawnData[i].Substring(indexToStart, spawnData[i].IndexOf(')')-indexToStart).Split(',');
+                
+                // This checks for if the spawn is exclusive to the slugcats listed, meaning it will spawn for all slugcats EXCEPT the ones listed here.
+                bool exclusive = spawnData[i].StartsWith("(X-");
+
+                if (!exclusive) {
+                    // Adds each slugcat listed to the slugcats that spawn this creature, by parsing the string into a 'SlugcatStats.Name' ExtEnum.
+                    foreach (string cat in slugcats) {
+                        slugCatsThatSpawnThisCreature.Add(cat);
+                    }
+                }
+                else {
+                    // Iterates over all the current registered slugcats, and adds the ones that are NOT in the 'slugcats' list of strings
+                    foreach (string slug in Utils.registeredSlugcats) {
+                        if (!slugcats.Contains(slug)) {
+                            slugCatsThatSpawnThisCreature.Add(slug);
+                        }
+                    }
+                }
+                // The slugcat data has been parsed, so remove it from the data string.
+                spawnData[i] = spawnData[i].Substring(spawnData[i].IndexOf(')')+1);
+            }
+            
+            // Extract if it is a lineage spawn, and if it is do that parsing logic
+            if (spawnData[i].StartsWith("LINEAGE")) {
+                isALineage = true;
+                spawnData[i] = spawnData[i].Substring("LINEAGE".Length).TrimStart().TrimStart(':').TrimStart();
+
+                // Get what room the lineage is for. Holdover from copying from my older project, but makes the logic easier so I'm keeping it.
+                string room = spawnData[i].Substring(0, Math.Min(spawnData[i].IndexOf(' '), spawnData[i].IndexOf(':')));
+                spawnData[i] = spawnData[i].Substring(room.Length).TrimStart().TrimStart(':').TrimStart();
+
+                // Get what den the lineage is for
+                string denAsString = spawnData[i].Substring(0, Math.Min(spawnData[i].IndexOf(' '), spawnData[i].IndexOf(':')));
+                pipeNumber.Add(int.Parse(denAsString));
+                spawnData[i] = spawnData[i].Substring(denAsString.Length).TrimStart().TrimStart(':').TrimStart();
+
+                // Get the creatures and their data (chance to progress to next creature, tags) for the lineage.
+                string[] creaturesAndChance = spawnData[i].Split(',');
+                lineageSpawns = new List<SpawnData.CreatureData>();
+                for (int j = 0; j < creaturesAndChance.Length; j++) {
+                    string[] singleCreatureData = creaturesAndChance[j].Trim().Split('-');
+                    // Parse the data for tags. If the second string starts with a '{' it is tag data, so use that. Otherwise tag data does not exist,
+                    // so set it to 0.
+                    string lineageTags = singleCreatureData[1].StartsWith("{")? singleCreatureData[1].Trim(new char[]{'{','}'}) : "";
+                    
+                    // Parse the data for chance to progress to next creature. If the second string starts with a '{' it is tag data, so use the string in the third
+                    // index. Otherwise the chance to progress is in the second string, so use that.
+                    string chance = singleCreatureData[1].StartsWith("{")? singleCreatureData[2] : singleCreatureData[1];
+                    lineageSpawns.Add(new SpawnData.CreatureData(singleCreatureData[0], lineageTags, chance));
+                }
+            }
+            // The logic for if it is a single creature spawn
+            else {
+                isALineage = false;
+                // Get the room from the data, single creature per den spawn data.
+                string room = spawnData[i].TrimStart().Substring(0, Math.Min(spawnData[i].IndexOf(' '), spawnData[i].IndexOf(':')));
+                // Then trim the data to remove the room information once it has been parsed
+                spawnData[i] = spawnData[i].Substring(room.Length).TrimStart().TrimStart(':').TrimStart();
+                // Split the data of what creatures can spawn here. Each line for non-lineage spawns can hold multiple creatures, so extract them
+                // into a list format.
+                string[] creaturesThatSpawnInThisRoom = spawnData[i].Split(',');
+                
+                for (int j = 0; j < creaturesThatSpawnInThisRoom.Length; j++) {
+                    // Copy the string so it is easier to work with, and trim it. Trim is needed because previous split step can leave whitespace
+                    // at the start of the string, since the spawn data format allows spaces between creature data after the ',' char.
+                    string individualRawCritData = creaturesThatSpawnInThisRoom[j].Trim();
+
+                    // Extract the den the creature spawns from, convert it into an int, and remove it from the raw data.
+                    string denAsString = individualRawCritData.Substring(0, Math.Max(individualRawCritData.IndexOf('-'), 1));
+                    pipeNumber.Add(int.Parse(denAsString));
+                    individualRawCritData = individualRawCritData.Substring(denAsString.Length).TrimStart().TrimStart('-').TrimStart();
+
+                    // Splits the rest of the creature data into a list so that it is easier to work with.
+                    // If this step was not taken, it would involve repeatedly checking the return value of IndexOf('-') to make sure
+                    // there was no more data left, and how much had been read already.
+                    List<string> singleCreatureDataToParse = individualRawCritData.Split('-').ToList();
+
+                    // The creature type is always mandatory, and the first to appear, so the first string entry can be used without checks safely
+                    critType.Add(singleCreatureDataToParse[0]);
+
+                    // Utils.DebugLog(individualRawCritData + " ");
+                    // singleCreatureDataToParse.ForEach(x => Utils.DebugLog(x));
+                    // Check the length of the data list for this creature.
+                    // 1 means that only creature data was included, tags and count were unspecified so they both get default values.
+                    // 2 means that either tags or count data was included, but not both.
+                    // 3 means that creature type, tags, and count were included. In this case, the positions of all data in the list
+                    // can be safely assumed to be in the order listed prior
+                    if (singleCreatureDataToParse.Count == 1) {
+                        tags.Add("");
+                        count.Add("1");
+                    }
+                    else if (singleCreatureDataToParse.Count == 2) {
+                        // Check if the second entry is tags or count. Tag data always starts with the '{' char, so that can be used to detect tag data.
+                        if (singleCreatureDataToParse[1].StartsWith("{")) {
+                            tags.Add(singleCreatureDataToParse[1].Substring(1, singleCreatureDataToParse[1].IndexOf('}')-1));
+                            count.Add("1");
+                        }
+                        // Otherwise, it was count data that was included.
+                        else {
+                            tags.Add("");
+                            count.Add(singleCreatureDataToParse[1]);
+                        }
+                    }
+                    else if (singleCreatureDataToParse.Count == 3) {
+                        if (singleCreatureDataToParse[1].StartsWith("{")) {
+                            tags.Add(singleCreatureDataToParse[1].Substring(1, singleCreatureDataToParse[1].IndexOf('}')-1));
+                            count.Add(singleCreatureDataToParse[2]);
+                        }
+                        else {
+                            tags.Add(singleCreatureDataToParse[2].Substring(1, singleCreatureDataToParse[2].IndexOf('}')-1));
+                            count.Add(singleCreatureDataToParse[1]);
+                        }
+                    }
+                }
+            }
+            // Use different constructors based on if the data is a lineage or individual spawns.
+            if (isALineage) {
+                this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[0], lineageSpawns!));
+                Utils.DebugLog("Converted spawn data: " + this.creatureSpawnData.Last().ToString());
+            }
+            else {
+                for (int j = 0; j < critType.Count; j++){
+                    this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[j], critType[j]!, tags[j], count[j]));
+                    Utils.DebugLog("Converted spawn data: " + this.creatureSpawnData.Last().ToString());
+                }
+            }
+        }
+
+        Utils.DebugLog("Dev map data: " + (devMapData ?? "") + "\n");
 
         SDL_image.IMG_SavePNG(roomSurface, Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "roomTextures" + Path.DirectorySeparatorChar + name.ToUpper()+".png");
     }
@@ -198,5 +373,99 @@ unsafe class RoomData {
     }
     public override string ToString() {
         return name + $" {devPosition} {size} {layer}";
+    }
+}
+public class SpawnData {
+    public SpawnData(List<string>? slugcats, int pipeNumber, string creatureType, string tags = "", string count = "1") {
+        this.slugcats = slugcats;
+        this.pipeNumber = pipeNumber;
+        this.isALineage = false;
+        this.creatureData = new CreatureData(creatureType, tags, count);
+        this. lineageSpawns = null;
+    }
+    public SpawnData(List<string>? slugcats, int pipeNumber, List<CreatureData> lineageSpawns) {
+        this.slugcats = slugcats;
+        this.pipeNumber = pipeNumber;
+        this.isALineage = true;
+        this.creatureData = null;
+        this. lineageSpawns = lineageSpawns;
+    }
+    public SpawnData(SpawnData rhs) {
+        if (rhs.slugcats != null) {
+            this.slugcats = new();
+            foreach (var cat in rhs.slugcats) {
+                this.slugcats.Add(cat);
+            }
+        }
+        else {
+            this.slugcats = null;
+        }
+        this.pipeNumber = rhs.pipeNumber;
+        this.isALineage = rhs.isALineage;
+        this.creatureData = rhs.creatureData == null ? null : new CreatureData(rhs.creatureData);
+        if (rhs.lineageSpawns != null) {
+            this.lineageSpawns = new();
+            foreach (var spawn in rhs.lineageSpawns) {
+                this.lineageSpawns.Add(new CreatureData(spawn));
+            }
+        }
+        else {
+            this.lineageSpawns = null;
+        }
+    }
+    public override string ToString() {
+        string toReturn = "";
+        if (slugcats != null) {
+            foreach (var scug in slugcats) {
+                toReturn += scug + ",";
+            }
+        }
+        else {
+            toReturn += "Any Slugcat";
+        }
+        toReturn += "   ";
+        toReturn += pipeNumber.ToString() + ",   ";
+        if (!isALineage && creatureData != null) {
+            if (creatureData.type != null) {
+                toReturn += creatureData.type;
+            }
+            else {
+                toReturn += "NONE";
+            }
+            toReturn += ",   ";
+            toReturn += (creatureData.tags == ""? "No Tags" : creatureData.tags) + ",   ";
+            toReturn += creatureData.countOrChance;
+        }
+        else {
+            if (lineageSpawns != null) {
+                foreach (CreatureData spawn in lineageSpawns) {
+                    toReturn += spawn.type + ", " + spawn.tags + ", " + spawn.countOrChance + ".  ";
+                }
+            }
+        }
+        toReturn += ".   ";
+        return toReturn;
+    }
+    public List<string>? slugcats;
+    public readonly int pipeNumber;
+    public bool isALineage;
+    public CreatureData? creatureData;
+    public List<CreatureData>? lineageSpawns;
+    
+    // A nested class to hold information about creature spawns. This helps organize data and reduce field clutter.
+    public class CreatureData {
+        public CreatureData(string type, string tags, string countOrChance) {
+            this.type = type;
+            this.tags = tags;
+            this.countOrChance = countOrChance;
+        }
+        public CreatureData(CreatureData rhs) {
+            this.type = rhs.type;
+            this.tags = rhs.tags;
+            this.countOrChance = rhs.countOrChance;
+        }
+        public string type;
+        public string tags;
+        public string countOrChance;
     }
 }

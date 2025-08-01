@@ -15,11 +15,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         Layer2 = 2,
         Layer3 = 4
     }
-    public enum Slugcat {
-        Yellow,
-        White,
-        Red
-    }
+    public string selectedSlugcat;
     static List<SDL.SDL_Vertex> circle = [
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
@@ -53,6 +49,23 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=-6, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=6}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
+    ];
+    static List<SDL.SDL_Vertex> square = [
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
     ];
     public int zoom;
     public bool dragged;
@@ -111,6 +124,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         currentlyHoveredRoom = null;
         prepareToCutConnections = new List<string[]>();
         currentlyEditingNodeSourceRoom = null;
+        selectedSlugcat = "White";
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
@@ -358,6 +372,10 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             else {
                 Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, circle.ToArray());
             }
+        }
+        for (int i = 0; i < room.creatureSpawnPositions.Count; i++) {
+            Vector2 spawnPosition = dragPosition + room.devPosition*0.5f + room.creatureSpawnPositions[i];
+            Utils.DrawGeometryWithVertices(renderer, spawnPosition, square.ToArray());
         }
         Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);
