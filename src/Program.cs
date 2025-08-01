@@ -48,6 +48,7 @@ internal class Program {
     internal float scrollY;
     internal string? folderToLoadFrom = null;
     internal WorldData? currentWorld;
+    IntPtr gameController = (IntPtr)null;
 
     #pragma warning disable CS8618
     internal List<WindowRenderCombo> windows;
@@ -64,8 +65,12 @@ internal class Program {
         }
 
         // Initilizes SDL
-        if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
+        if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO | SDL.SDL_INIT_GAMECONTROLLER) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
             Utils.DebugLog($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
+        }
+
+        if (SDL.SDL_NumJoysticks() > 0) {
+            gameController = SDL.SDL_GameControllerOpen(0);
         }
 
         // Load fonts
@@ -97,6 +102,12 @@ internal class Program {
             switch (e.type) {
                 case SDL.SDL_EventType.SDL_QUIT:
                     running = false;
+                    break;
+                case SDL.SDL_EventType.SDL_CONTROLLERBUTTONDOWN:
+                    Utils.DebugLog(e.cbutton.button);
+                    break;
+                case SDL.SDL_EventType.SDL_CONTROLLERAXISMOTION:
+                    Utils.DebugLog(e.caxis.axisValue + " " + e.caxis.axis);
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN:
                     if (e.button.button == SDL.SDL_BUTTON_LEFT || e.button.button == SDL.SDL_BUTTON_MIDDLE) {
@@ -174,6 +185,9 @@ internal class Program {
             SDL.SDL_DestroyWindow(window.window);
             if (window is MainWindow mainWindow)
             mainWindow.worldRenderer.Destroy();
+        }
+        if (gameController != (IntPtr)null) {
+            SDL.SDL_GameControllerClose(gameController);
         }
         currentWorld?.Destroy();
         SDL_ttf.TTF_CloseFont(Utils.currentFont);
