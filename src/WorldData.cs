@@ -73,6 +73,7 @@ unsafe class RoomData {
     public List<string> roomConnections;
     public List<Vector2> creatureSpawnPositions;
     public List<SpawnData> creatureSpawnData;
+    public Dictionary<int, int> creatureDenIndexToAbstractNodeMap;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
@@ -114,6 +115,7 @@ unsafe class RoomData {
 
         roomConnectionPositions = new();
         creatureSpawnPositions = new();
+        creatureDenIndexToAbstractNodeMap = new();
         // We have the minimum needs to create the room surface, so we make the default now and fill it with useful pixels in the next part.
         // Also here be endianness
         roomSurface = SDL.SDL_CreateRGBSurface(0, (int)size.X, (int)size.Y, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
@@ -132,6 +134,7 @@ unsafe class RoomData {
                         if (singleTileData.Length >= 2 && singleTileData[1] == 5) {
                             color.r = 255;
                             color.g = 255;
+                            creatureDenIndexToAbstractNodeMap.Add(creatureDenIndexToAbstractNodeMap.Count, creatureSpawnPositions.Count);
                             creatureSpawnPositions.Add(new Vector2(i, j));
                         }
                         if (singleTileData.Length >= 2 && singleTileData[1] == 4) {
@@ -163,12 +166,16 @@ unsafe class RoomData {
                         if (singleTileData[1] == 5) {
                             color.r = 255;
                             color.g = 255;
+                            creatureDenIndexToAbstractNodeMap.Add(creatureDenIndexToAbstractNodeMap.Count, creatureSpawnPositions.Count);
                             creatureSpawnPositions.Add(new Vector2(i, j));
                         }
                     }
 
                     Utils.SetPixel(roomSurface, i, j, color);
                 }
+            }
+            for (int i = 0; i < creatureDenIndexToAbstractNodeMap.Count; i++) {
+                creatureDenIndexToAbstractNodeMap[i] = creatureDenIndexToAbstractNodeMap[i] + roomConnectionPositions.Count;
             }
         } catch (Exception err) {
             Utils.DebugLog(err);
@@ -281,7 +288,7 @@ unsafe class RoomData {
                     // Parse the data for chance to progress to next creature. If the second string starts with a '{' it is tag data, so use the string in the third
                     // index. Otherwise the chance to progress is in the second string, so use that.
                     string chance = singleCreatureData[1].StartsWith("{")? singleCreatureData[2] : singleCreatureData[1];
-                    lineageSpawns.Add(new SpawnData.CreatureData(singleCreatureData[0], lineageTags, chance));
+                    lineageSpawns.Add(new SpawnData.CreatureData(SpawnData.ConvertAliasToName(singleCreatureData[0]), lineageTags, chance));
                 }
             }
             // The logic for if it is a single creature spawn
@@ -355,7 +362,7 @@ unsafe class RoomData {
             }
             else {
                 for (int j = 0; j < critType.Count; j++){
-                    this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[j], critType[j]!, tags[j], count[j]));
+                    this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[j], SpawnData.ConvertAliasToName(critType[j]!), tags[j], count[j]));
                     Utils.DebugLog("Converted spawn data: " + this.creatureSpawnData.Last().ToString());
                 }
             }
@@ -445,6 +452,84 @@ public class SpawnData {
         }
         toReturn += ".   ";
         return toReturn;
+    }
+    public static string ConvertAliasToName(string alias) {
+        return alias.ToLower() switch {
+            "pink" or "pinklizard" => "PinkLizard",
+            "green" or "greenlizard" => "GreenLizard",
+            "blue" or "bluelizard" => "BlueLizard",
+            "yellow" or "yellowLizard" => "YellowLizard",
+            "white" or "whitelizard" => "WhiteLizard",
+            "black" or "blacklizard" => "BlackLizard",
+            "cyan" or "cyanlizard" => "Cyanlizard",
+            "red" or "redlizard" => "RedLizard",
+            "spider" => "Spider",
+            "smallcentipede" => "SmallCentipede",
+            "centi" or "centipede" => "Centipede",
+            "redcenti" or "red centi" or "red centipede" or "redcentipede" => "RedCentipede",
+            "dropwig" or "drop wig" or "drop bug" or "dropbug" => "DropBug",
+            "big spider" or "bigspider" => "BigSpider",
+            "spitter spider" or "spitterspider" => "SpitterSpider",
+            "egg bug" or "eggbug" => "EggBug",
+            "salamander" => "Salamander",
+            "leech" => "Leech",
+            "sea leech" or "sealeech" => "SeaLeech",
+            "jet fish" or "jetfish" => "JetFish",
+            "snail" => "Snail",
+            "lev" or "leviathan" or "big eel" or "bigeel" => "BigEel",
+            "cicada a" or "cicadaa" => "CicadaA",
+            "cicada b" or "cicadab" => "CicadaB",
+            "vulture" => "Vulture",
+            "king vulture" or "kingvulture" => "KingVulture",
+            "needle" or "needle worm" or "bigneedle" or "big needle" or "bigneedleworm" => "BigNeedleWorm",
+            "small needle" or "smallneedle" or "smallneedleworm" => "SmallNeedleWorm",
+            "centiwing" => "Centiwing",
+            "cicada" => "Cicada",
+            "mimic" or "pole mimic" or "polemimic" => "PoleMimic",
+            "tentacle" or "tentacle plant" or "tentacleplant" => "TentaclePlant",
+            "scavenger" => "Scavenger",
+            "mouse" or "lantern mouse" or "lanternmouse" => "LanternMouse",
+            "worm" or "garbage worm" or "garbageworm" => "GarbageWorm",
+            "miros" or "miros bird" or "mirosbird" => "MirosBird",
+            "tube" or "tube worm" or "tubeworm" => "TubeWorm",
+            "bro" or "brolonglegs" or "bro long legs" or "brotherlonglegs" => "BrotherLongLegs",
+            "daddy" or "daddy long legs" or "daddylonglegs" => "DaddyLongLegs",
+            "deer" => "Deer",
+            "caramel" or "spitlizard" => "SpitLizard",
+            "eel" or "eellizard" => "EelLizard",
+            "strawberry" or "zooplizard" => "ZoopLizard",
+            "aqua centi" or "aquacentipede" or "aqua centipede" or "aquapede" or "aquacenti" => "AquaCenti",
+            "mother spider" or "motherspider" => "MotherSpider",
+            "yeek" => "Yeek",
+            "jungleleech" => "JungleLeech",
+            "miros vulture" or "mirosvulture" => "MirosVulture",
+            "elite" or "scavenger elite" or "elitescavenger" or "elite scavenger" or "scavengerelite" => "ScavengerElite",
+            "terror" or "mother" or "motherlonglegs" or "mother long legs" or "terror long legs" or "terrorlonglegs" => "TerrorLongLegs",
+            "inspector" => "Inspector",
+            "train" or "trainlizard" => "TrainLizard",
+            "fire bug" or "hellbug" or "hell bug" or "firebug" => "FireBug",
+            "hunter" or "hunter daddy" or "hunterdaddy" => "HunterDaddy",
+            "blizzard" or "blizard" or "blizzard lizard" or "blizzardlizard" => "BlizzardLizard",
+            "indigo" or "indigo lizard" or "skink" or "indigolizard" => "IndigoLizard",
+            "big moth" or "bigmoth" => "BigMoth",
+            "small moth" or "smallmoth" => "SmallMoth",
+            "frog" => "Frog",
+            "barnacle" => "Barnacle",
+            "seapig" or "tardigrade" => "Tardigrade",
+            "sky whale" or "skywhale" => "SkyWhale",
+            "firesprite" => "FireSprite",
+            "drillcrab" => "DrillCrab",
+            "sandgrub" => "SandGrub",
+            "bigsandgrub" => "BigSandGrub",
+            "boxworm" => "BoxWorm",
+            "rattler" => "Rattler",
+            "templar" or "scavenger templar" or "templarscavenger" or "templar scavenger" or "scavengertemplar" => "ScavengerTemplar",
+            "disciple" or "scavengerdisciple" or "scavenger disciple" or "disciplescavenger" or "disciple scavenger" or "scavengerdisciple" => "ScavengerDisciple",
+            "loach" => "Loach",
+            "rotbehemoth" or "rot behemoth" or "rbehemoth" or "behemoth" or "bigrot" or "rotloach" => "RotLoach",
+            "rat" => "Rat",
+            _ => alias,
+        };
     }
     public List<string>? slugcats;
     public readonly int pipeNumber;

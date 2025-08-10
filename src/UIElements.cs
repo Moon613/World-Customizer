@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using SDL2;
-using System.Threading;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace WorldCustomizer;
 #nullable enable
@@ -135,6 +135,8 @@ class SlugcatSelector : Draggable, IRenderable {
         }
     }
     public void SetSlugcat(Button button) {
+        GetParentWindow().updatables.RemoveAll(x => x is DenMenu);
+        GetParentWindow().renderables.RemoveAll(x => x is DenMenu);
         GetParentMainWindow().worldRenderer.selectedSlugcat = button.text;
     }
 }
@@ -380,17 +382,19 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
     internal Vector2 textOffset;
     readonly int ptsize;
     readonly bool hasBorder;
-    SDL.SDL_Color color;
+    SDL.SDL_Color textColor;
     internal bool greyedOut;
-    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null, bool greyedOut = false) : base(position, Vector2.Zero, parent) {
+    internal object? Data { get; set; }
+    internal Button(string text, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? textColor = null, bool greyedOut = false, object? extraData = null) : base(position, Vector2.Zero, parent) {
         this.text = text;
         this.size = new Vector2(width + 2*(int)textOffset.X, height + 2*(int)textOffset.Y);
         this.ptsize = ptsize;
         this.textOffset = textOffset;
         this.hasBorder = hasBorder;
         this.Clicked += action;
-        this.color = (SDL.SDL_Color)((color==null) ? new SDL.SDL_Color(){r=255, g=255, b=255, a=255} : color);
+        this.textColor = (SDL.SDL_Color)((textColor==null) ? new SDL.SDL_Color(){r=255, g=255, b=255, a=255} : textColor);
         this.greyedOut = greyedOut;
+        Data = extraData;
     }
     public virtual void Render(IntPtr window, IntPtr renderer) {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
@@ -404,7 +408,7 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref r);
         }
-        Utils.WriteText(renderer, window, text, Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize, color);
+        Utils.WriteText(renderer, window, text, Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize, textColor);
         if (greyedOut) {
             SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
             SDL.SDL_RenderFillRectF(renderer, ref r);
@@ -412,7 +416,7 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
     }
     public void Update() {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
-        if (!greyedOut && GetParentWindow().IsFocused && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+        if (!greyedOut && GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
             Clicked.Invoke(this);
         }
     }
@@ -457,17 +461,17 @@ class Button : GenericUIElement, IRenderable, IAmInteractable {
     }
 }
 class ButtonWithImage : Button {
-    readonly string image;
-    Vector2 imageSize;
+    internal string image;
+    internal Vector2 imageSize;
     readonly float imageXOffset;
-    internal ButtonWithImage(string text, string image, Vector2 imageSize, float imageXOffset, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null) : base(text, parent, position, width, height, ptsize, textOffset + new Vector2(imageSize.X, 0), hasBorder, action, color) {
+    internal ButtonWithImage(string text, string image, Vector2 imageSize, float imageXOffset, GenericUIElement? parent, Vector2 position, int width, int height, int ptsize, Vector2 textOffset, bool hasBorder, Action<Button> action, SDL.SDL_Color? color = null, object? extraData = null) : base(text, parent, position, width, height, ptsize, textOffset + new Vector2(imageSize.X, 0), hasBorder, action, color, extraData: extraData) {
         this.image = image;
         this.imageSize = imageSize;
         this.imageXOffset = imageXOffset;
     }
     public override void Render(IntPtr window, IntPtr renderer) {
         base.Render(window, renderer);
-        IntPtr texture = SDL_image.IMG_LoadTexture(renderer, "E:/World-Customizer/Build/textures" + Path.DirectorySeparatorChar + image);
+        IntPtr texture = SDL_image.IMG_LoadTexture(renderer, Utils.TexturesPath + image);
         if (texture == IntPtr.Zero) {
             Utils.DebugLog("Could not load image");
             Utils.DebugLog(SDL.SDL_GetError());
@@ -480,6 +484,301 @@ class ButtonWithImage : Button {
         }
 
         SDL.SDL_DestroyTexture(texture);
+    }
+}
+class CheckBox : GenericUIElement, IRenderable, IAmInteractable {
+    public bool active;
+    public IntPtr activeImage;
+    public IntPtr? inactiveImage;
+    public CheckBox(Vector2 position, Vector2 size, GenericUIElement parent, bool active, string activeImage, string? inactiveImage = null) : base(position, size, parent) {
+        this.active = active;
+        this.activeImage = SDL_image.IMG_LoadTexture(GetParentWindow().renderer, Utils.TexturesPath + activeImage);
+        this.inactiveImage = inactiveImage==null? null : SDL_image.IMG_LoadTexture(GetParentWindow().renderer, Utils.TexturesPath + inactiveImage);
+    }
+    ~CheckBox() {
+        SDL.SDL_DestroyTexture(activeImage);
+        if (inactiveImage != null) {
+            SDL.SDL_DestroyTexture((nint)inactiveImage);
+        }
+    }
+    public void Render(nint window, nint renderer) {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        var rect = new SDL.SDL_FRect(){x=Position.X, y=Position.Y, w=size.X, h=size.Y};
+        if (GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+            SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref rect);
+        }
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL.SDL_RenderDrawRectF(renderer, ref rect);
+        if (active) {
+            SDL.SDL_RenderCopyF(renderer, activeImage, (IntPtr)null, ref rect);
+        }
+        else if (inactiveImage != null) {
+            SDL.SDL_RenderCopyF(renderer, (nint)inactiveImage, (IntPtr)null, ref rect);
+        }
+    }
+    public void Signal(string text) {
+        throw new NotImplementedException();
+    }
+    public void Update() {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        if (GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && GetParentWindow().parentProgram.clicked && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+            active = !active;
+        }
+    }
+    internal override WindowRenderCombo GetParentWindow() {
+        return parent!.GetParentWindow();
+    }
+}
+class ScrollButton : GenericUIElement, IRenderable, IAmInteractable {
+    public float currentValue, min, max;
+    Vector2 textOffset;
+    readonly int ptsize;
+    SDL.SDL_Color textColor;
+    float increaseBy;
+    public ScrollButton(Vector2 position, Vector2 size, GenericUIElement parent, float min, float max, Vector2 textOffset, int ptsize, float? currentValue = null, float? increaseBy = null, SDL.SDL_Color? textColor = null) : base(position, size, parent) {
+        this.currentValue = currentValue ?? min;
+        this.min = min;
+        this.max = max;
+        this.textOffset = textOffset;
+        this.ptsize = ptsize;
+        this.textColor = textColor ?? new SDL.SDL_Color(){r=255, g=255, b=255, a=255};
+        this.increaseBy = increaseBy ?? 1;
+    }
+    public void Render(nint window, nint renderer) {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        var r = new SDL.SDL_FRect() {x = Position.X, y = Position.Y, w = size.X, h = size.Y};
+        
+        if (GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+            SDL.SDL_SetRenderDrawColor(renderer, 82, 82, 82, 255);
+            SDL.SDL_RenderFillRectF(renderer, ref r);
+        }
+        SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL.SDL_RenderDrawRectF(renderer, ref r);
+        Utils.WriteText(renderer, window, Math.Round(currentValue, 2).ToString(), Utils.currentFont, (int)Position.X+(int)textOffset.X, (int)Position.Y+(int)textOffset.Y, ptsize, textColor);
+    }
+    public void Signal(string text) {
+        throw new NotImplementedException();
+    }
+    public void Update() {
+        SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
+        if (GetParentWindow().IsFocused && (GetParentWindow() is MainWindow mainWindow && mainWindow.currentlyFocusedObject == parent || GetParentWindow() is not MainWindow) && GetParentWindow().parentProgram.scrollY != 0 && mouseX >= Position.X && mouseX < Position.X+size.X && mouseY >= Position.Y && mouseY < Position.Y+size.Y) {
+            currentValue = Math.Max(min, Math.Min(max, currentValue+(increaseBy*GetParentWindow().parentProgram.scrollY)));
+        }
+    }
+    internal override WindowRenderCombo GetParentWindow() {
+        return parent!.GetParentWindow();
+    }
+}
+class DenMenu : Draggable {
+    internal List<SpawnData> spawnData;
+    readonly string roomName;
+    private int currentSpawnIndex;
+    Button prevButton, nextButton, deleteButton;
+    internal ButtonWithImage singleCreatureSelect;
+    internal ScrollButton singleCreatureCount;
+    internal List<ButtonWithImage> lineageCreatureSelects;
+    internal List<ScrollButton> lineageCreatureProgressions;
+    Button[] slugcatButtons;
+    CheckBox lineageToggle;
+    int heightForBelowSlugcatButtons;
+    readonly static Vector2 buttonTextOffset = new Vector2(5, 6);
+    public DenMenu(Vector2 position, Vector2 size, GenericUIElement parent, List<SpawnData> spawnData, string roomName) : base(position, size, parent) {
+        const int StartHeightOfSlugcatButtons = 90;
+        const int SlugButtonRowHeight = 35;
+        const int SlugButtonHeight = 16;
+        this.spawnData = spawnData;
+        this.roomName = roomName;
+        currentSpawnIndex = 0;
+        prevButton = new Button("Previous Spawn", this, new Vector2(10, 25), 125, 15, 16, new Vector2(5), true, ChangeCurrentSpawn);
+        nextButton = new Button("Next Spawn", this, new Vector2(150, 25), 90, 15, 16, new Vector2(5, 5), true, ChangeCurrentSpawn);
+        deleteButton = new Button("Delete", this, new Vector2(115, 55), 55, 15, 16, new Vector2(5, 5), true, DeleteSpawn);
+        slugcatButtons = new Button[Utils.registeredSlugcats.Length];
+        for (int i = 0; i < Utils.registeredSlugcats.Length; i++) {
+            slugcatButtons[i] = new Button(Utils.registeredSlugcats[i].Substring(0, 2), this, new Vector2((10+i*40)%280, StartHeightOfSlugcatButtons+(i/7*SlugButtonRowHeight)), 19, SlugButtonHeight, 16, new Vector2(5, 5), true, UpdateSelectedSlugcats, extraData: Utils.registeredSlugcats[i]);
+        }
+        heightForBelowSlugcatButtons = StartHeightOfSlugcatButtons+((Utils.registeredSlugcats.Length-1)/7*SlugButtonRowHeight)+25+SlugButtonHeight;
+        lineageToggle = new CheckBox(new Vector2(175, heightForBelowSlugcatButtons-2.5f), new Vector2(25), this, spawnData[0].isALineage, "checkmark.png", "x.png");
+        lineageCreatureProgressions = new();
+        lineageCreatureSelects = new();
+        if (!spawnData[currentSpawnIndex].isALineage) {
+            Vector2 imageSize = Utils.GetImageSize(Utils.TexturesPath+spawnData[currentSpawnIndex].creatureData!.type+".png");
+            singleCreatureSelect = new ButtonWithImage(spawnData[currentSpawnIndex].creatureData!.type, spawnData[currentSpawnIndex].creatureData!.type+".png", new Vector2(imageSize.X*(20f/imageSize.Y), 20), 2.5f, this, new Vector2(135, heightForBelowSlugcatButtons+31), 100, 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: -1);
+
+            singleCreatureCount = new ScrollButton(new Vector2(80, heightForBelowSlugcatButtons+60), new Vector2(30, 20), this, 1, int.MaxValue, new Vector2(5,2.5f), 16, int.Parse(spawnData[currentSpawnIndex].creatureData!.countOrChance));
+        }
+        else {
+            singleCreatureSelect = new ButtonWithImage("NONE", "NONE.png", new Vector2(25, 20), 2.5f, this, new Vector2(135, heightForBelowSlugcatButtons+31), 100, 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: -1);
+            singleCreatureCount = new ScrollButton(new Vector2(80, heightForBelowSlugcatButtons+60), new Vector2(30, 20), this, 1, int.MaxValue, new Vector2(5,2.5f), 16);
+
+            for (int i = 0; i < spawnData[currentSpawnIndex].lineageSpawns!.Count; i++) {
+                Vector2 imageSize = Utils.GetImageSize(Utils.TexturesPath+spawnData[currentSpawnIndex].lineageSpawns![i].type+".png");
+                lineageCreatureSelects.Add(new ButtonWithImage(spawnData[currentSpawnIndex].lineageSpawns![i].type, spawnData[currentSpawnIndex].lineageSpawns![i].type+".png", new Vector2(imageSize.X*(20f/imageSize.Y), 20), 2.5f, this, new Vector2(135, heightForBelowSlugcatButtons+i*40), 100, 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: i));
+                lineageCreatureProgressions.Add(new ScrollButton(new Vector2(80, heightForBelowSlugcatButtons+60*i), new Vector2(30, 20), this, 0, 1, new Vector2(5,2.5f), 16, float.Parse(spawnData[currentSpawnIndex].lineageSpawns![i].countOrChance), 0.01f));
+            }
+        }
+    }
+    public override void Render(nint window, nint renderer) {
+        base.Render(window, renderer);
+        Utils.WriteText(renderer, window, roomName.ToUpper() + ", Den: " + spawnData[currentSpawnIndex].pipeNumber, Utils.currentFont, Position.X+5, Position.Y+5, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
+        prevButton.Render(window, renderer);
+        deleteButton.Render(window, renderer);
+        nextButton.Render(window, renderer);
+        foreach (Button button in slugcatButtons) {
+            var rect = new SDL.SDL_FRect(){x=button.Position.X, y=button.Position.Y, w=button.size.X, h=button.size.Y};
+            if (spawnData[currentSpawnIndex].slugcats?.Contains((string)button.Data!) ?? false) {
+                SDL.SDL_SetRenderDrawColor(renderer, 0, 255, 0, alpha);
+                SDL.SDL_RenderFillRectF(renderer, ref rect);
+            }
+            else if (spawnData[currentSpawnIndex].slugcats != null) {
+                SDL.SDL_SetRenderDrawColor(renderer, 255, 0, 0, alpha);
+                SDL.SDL_RenderFillRectF(renderer, ref rect);
+            }
+            button.Render(window, renderer);
+        }
+        Utils.WriteText(renderer, window, "Is this a Lineage?", Utils.currentFont, Position.X+10, Position.Y+heightForBelowSlugcatButtons, 16);
+        lineageToggle.Render(window, renderer);
+        if (!spawnData[currentSpawnIndex].isALineage) {
+            Utils.WriteText(renderer, window, "Creature Type:", Utils.currentFont, Position.X+10, Position.Y+heightForBelowSlugcatButtons+35, 16);
+            singleCreatureSelect.Render(window, renderer);
+            
+            Utils.WriteText(renderer, window, "Amount:", Utils.currentFont, Position.X+10, Position.Y+heightForBelowSlugcatButtons+60, 16);
+            singleCreatureCount.Render(window, renderer);
+        }
+        else {
+            for (int i = 0; i < lineageCreatureSelects.Count; i++) {
+                lineageCreatureSelects[i].Render(window, renderer);
+                lineageCreatureProgressions[i].Render(window, renderer);
+            }
+        }
+    }
+    public override void Update() {
+        base.Update();
+        prevButton.greyedOut = spawnData.Count <= 1;
+        nextButton.greyedOut = spawnData.Count <= 1;
+        prevButton.Update();
+        deleteButton.Update();
+        nextButton.Update();
+        foreach (Button button in slugcatButtons) {
+            button.Update();
+        }
+        lineageToggle.Update();
+        spawnData[currentSpawnIndex].isALineage = lineageToggle.active;
+        if (!spawnData[currentSpawnIndex].isALineage) {
+            singleCreatureSelect.Update();
+            singleCreatureCount.Update();
+        }
+        else {
+            for (int i = 0; i < lineageCreatureSelects.Count; i++) {
+                lineageCreatureSelects[i].Update();
+                lineageCreatureProgressions[i].Update();
+            }
+        }
+    }
+    public void OpenCreatureSelector(Button e) {
+        CreatureSelector creatureSelector = new CreatureSelector(e._position, new Vector2(300, 650), parent!, this, (int)e.Data!);
+        GetParentWindow().AddChild(creatureSelector);
+    }
+    public void ChangeCurrentSpawn(Button e) {
+        if (e == prevButton) {
+            currentSpawnIndex = currentSpawnIndex-1<0? spawnData.Count-1 : currentSpawnIndex-1;
+        }
+        else if (e == nextButton) {
+            currentSpawnIndex = (currentSpawnIndex+1)%spawnData.Count;
+        }
+        GetParentWindow().updatables.RemoveAll(x => x is CreatureSelector creatureSelector && creatureSelector.denMenu == this);
+        GetParentWindow().renderables.RemoveAll(x => x is CreatureSelector creatureSelector && creatureSelector.denMenu == this);
+        ButtonInfoUpdate(singleCreatureSelect, spawnData[currentSpawnIndex].creatureData?.type ?? "NONE");
+    }
+    public void DeleteSpawn(Button _) {
+        GetParentWindow().parentProgram.currentWorld?.roomData.First(x => x.name == roomName).creatureSpawnData.Remove(spawnData[currentSpawnIndex]);
+        Close(_);
+    }
+    public void UpdateSelectedSlugcats(Button e) {
+        if (spawnData[currentSpawnIndex].slugcats == null) {
+            spawnData[currentSpawnIndex].slugcats = new();
+        }
+        if (!spawnData[currentSpawnIndex].slugcats!.Remove((string)e.Data!)) {
+            spawnData[currentSpawnIndex].slugcats!.Add((string)e.Data!);
+        }
+        if (spawnData[currentSpawnIndex].slugcats!.Count == 0) {
+            spawnData[currentSpawnIndex].slugcats = null;
+        }
+    }
+    public static void ButtonInfoUpdate(ButtonWithImage button, string text) {
+        button.text = text;
+        button.image = text+".png";
+        Vector2 imageSize = Utils.GetImageSize(Utils.TexturesPath+button.image);
+        button.imageSize.X = imageSize.X*(20f/imageSize.Y);
+        button.textOffset.X = buttonTextOffset.X + button.imageSize.X;
+    }
+    class CreatureSelector : Draggable {
+        public readonly DenMenu denMenu;
+        readonly int creatureToAlter;
+        List<List<ButtonWithImage>> creatureButtonPages;
+        ButtonWithImage nextButton, prevButton;
+        int currentPage;
+        public CreatureSelector(Vector2 position, Vector2 size, GenericUIElement parent, DenMenu denMenu, int creatureToAlter) : base(position, size, parent) {
+            this.denMenu = denMenu;
+            this.creatureToAlter = creatureToAlter;
+            currentPage = 0;
+            // Each page can fit 78 creatures on it.
+            creatureButtonPages = Enumerable.Repeat(new List<ButtonWithImage>(), Utils.registeredCreatures.Length/78+1).ToList();
+            for (int i = 0; i < Utils.registeredCreatures.Length; i++) {
+                const int MaxSize = 40;
+                Vector2 imageSize = Utils.GetImageSize(Utils.TexturesPath + Utils.registeredCreatures[i]+".png");
+                imageSize.X = Math.Min(MaxSize, imageSize.X);
+                imageSize.Y = Math.Min(MaxSize, imageSize.Y);
+                
+                creatureButtonPages[i/78].Add(new ButtonWithImage("", Utils.registeredCreatures[i]+".png", imageSize, (MaxSize-imageSize.X)/2, this, new Vector2(20+((i%78)%6)*45, 40+((i%78)/6)*45), MaxSize, MaxSize-(MaxSize-(int)imageSize.Y), 0, new Vector2(-imageSize.X, (MaxSize-imageSize.Y)/2), true, SetCreature, extraData: Utils.registeredCreatures[i]));
+            }
+            nextButton = new ButtonWithImage("", "NEXT.png", new Vector2(36, 26), 5, this, size - new Vector2(60, 28), -20, 25, 0, new Vector2(0, 0), true, NextPage){greyedOut=creatureButtonPages.Count <= 1};
+            prevButton = new ButtonWithImage("", "PREV.png", new Vector2(36, 26), 4, this, new Vector2(15, size.Y-28), -20, 25, 0, new Vector2(0, 0), true, PrevPage){greyedOut=creatureButtonPages.Count <= 1};
+        }
+        public override void Update() {
+            base.Update();
+            if (!GetParentWindow().updatables.Contains(denMenu)) {
+                GetParentWindow().RemoveChild(this);
+                return;
+            }
+            foreach (var button in creatureButtonPages[currentPage]) {
+                button.Update();
+            }
+            prevButton.Update();
+            nextButton.Update();
+        }
+        public override void Render(nint window, nint renderer) {
+            base.Render(window, renderer);
+            Utils.WriteText(renderer, window, "Creature Selector", Utils.currentFont, Position.X+5, Position.Y+5, 18);
+            if (creatureToAlter == -1) {
+                SDL.SDL_RenderDrawLineF(renderer, Position.X, Position.Y, denMenu.singleCreatureSelect.Position.X, denMenu.singleCreatureSelect.Position.Y);
+            }
+            else {
+                // Add this once lineage buttons are added.
+                throw new NotImplementedException();
+            }
+            foreach (var button in creatureButtonPages[currentPage]) {
+                button.Render(window, renderer);
+            }
+            prevButton.Render(window, renderer);
+            nextButton.Render(window, renderer);
+        }
+        public void SetCreature(Button e) {
+            if (creatureToAlter == -1) {
+                denMenu.spawnData[denMenu.currentSpawnIndex].creatureData!.type = (string)e.Data!;
+                ButtonInfoUpdate(denMenu.singleCreatureSelect, (string)e.Data!);
+            }
+            else {
+                denMenu.spawnData[denMenu.currentSpawnIndex].lineageSpawns![creatureToAlter].type = (string)e.Data!;
+                throw new NotImplementedException();
+            }
+        }
+        public void NextPage(Button _) {
+            currentPage = (currentPage+1)%creatureButtonPages.Count;
+        }
+        public void PrevPage(Button _) {
+            currentPage = (currentPage+1)%creatureButtonPages.Count;
+        }
     }
 }
 internal class WindowRenderCombo : GenericUIElement, IRenderable, IAmInteractable {

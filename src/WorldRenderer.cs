@@ -52,20 +52,37 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     ];
     static List<SDL.SDL_Vertex> square = [
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=-3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-2, y=2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=2, y=2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=2, y=2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=2, y=-2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=-3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=2, y=-2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-2, y=-2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=-3, y=-3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
-        new(){position=new SDL.SDL_FPoint(){x=-3, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
+        new(){position=new SDL.SDL_FPoint(){x=-2, y=-2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-2, y=2}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
+    ];
+    static List<SDL.SDL_Vertex> biggerSquare = [
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-4, y=4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=4, y=4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=4, y=4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=4, y=-4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=4, y=-4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-4, y=-4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        
+        new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-4, y=-4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
+        new(){position=new SDL.SDL_FPoint(){x=-4, y=4}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}}
     ];
     public int zoom;
     public bool dragged;
@@ -118,7 +135,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     public WorldRenderer(Vector2 position, Vector2 size, GenericUIElement parent, IntPtr renderer) : base(position, size, parent) {
         zoom = 1;
         dragged = false;
-        currentlyFocusedLayers = Layers.Layer1;
+        currentlyFocusedLayers = Layers.Layer1 | Layers.Layer2 | Layers.Layer3;
         originalSize = size;
         dragPosition = Vector2.Zero;
         currentlyHoveredRoom = null;
@@ -198,34 +215,38 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         float scrollY = GetParentWindow().parentProgram.scrollY;
         prepareToCutConnections.Clear();
         
-        // Checks that a zoom is actually happening and that it will not make the world dissappear.
-        if (!dragged && scrollY != 0 && (int)scrollY+zoom >= 1 && (int)scrollY+zoom <= 20) {
-            zoom += (int)scrollY;
-            if (scrollY > 0) {
-                Position += (int)scrollY * new Vector2(32, 18);
-                size -= (int)scrollY * new Vector2(64, 36);
-            }
-            else if (scrollY < 0) {
-                Position += (int)scrollY * new Vector2(32, 18);
-                size -= (int)scrollY * new Vector2(64, 36);
-            }
-        }
         
         if (GetParentWindow().IsFocused) {
+            // Checks that a zoom is actually happening and that it will not make the world dissappear.
+            if (!dragged && scrollY != 0 && (int)scrollY+zoom >= 1 && (int)scrollY+zoom <= 20) {
+                zoom += (int)scrollY;
+                if (scrollY > 0) {
+                    Position += (int)scrollY * new Vector2(32, 18);
+                    size -= (int)scrollY * new Vector2(64, 36);
+                }
+                else if (scrollY < 0) {
+                    Position += (int)scrollY * new Vector2(32, 18);
+                    size -= (int)scrollY * new Vector2(64, 36);
+                }
+            }
             // This is used to report if the mouse is currently over a room on the current frame, so that it is not immediantly de-selected when
             // not dragging it around.
             bool mouseOverRoom = false;
             if (WorldData != null) {
+                // This candidate room is needed because otherwise rooms before the actual hovered room in the draw order would steal become the
+                // currently hovered room, activating all checks for if that room is the current one in the loop when they shouldn't have been true.
+                // So this is assigned to that value after the loop.
+                RoomData? candidateHoveredRoom = null;
                 foreach (RoomData room in WorldData.roomData) {
                     Vector2 roomPosition = dragPosition + room.devPosition*0.5f;
                     if (currentlyEditingNodeSourceRoom == null && !dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X && scaledMousePos.X < roomPosition.X+room.size.X && scaledMousePos.Y > roomPosition.Y && scaledMousePos.Y < roomPosition.Y+room.size.Y && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
-                        currentlyHoveredRoom = room;
+                        candidateHoveredRoom = room;
                         mouseOverRoom = true;
                     }
 
                     for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
                         Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
-                        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6;
+                        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
                         // Gates break a lot rn so don't use them.
                         if (room.roomConnections[i].Contains("GATE")) {
                             continue;
@@ -237,6 +258,11 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                         
                         RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
                         int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
+                        if (indexInConnectedRoomConList == -1) {
+                            Utils.DebugLog($"Error finding room connection position from {room.name} to {connectedRoom.name}. Removed problematic connection.");
+                            room.roomConnections[i] = "DISCONNECTED";
+                            continue;
+                        }
                         Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
 
                         // This code is for cutting a room connection
@@ -257,13 +283,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                         }
                         ThisConnectionIsDisconnected:
                         if (clickedOnNode) {
-                            if (currentlyEditingNodeSourceRoom == null) {
+                            if (currentlyEditingNodeSourceRoom == null && currentlyHoveredRoom == room) {
                                 currentlyHoveredRoom = null;
                                 room.roomConnections[i] = "DISCONNECTED";
                                 currentlyEditingNodeSourceRoom = room.name.ToUpper();
                                 grabbedConnectionIndex = i;
                             }
-                            else if (room.name.ToUpper() != currentlyEditingNodeSourceRoom) {
+                            else if (currentlyEditingNodeSourceRoom != null && room.name.ToUpper() != currentlyEditingNodeSourceRoom) {
                                 room.roomConnections[i] = currentlyEditingNodeSourceRoom;
                                 WorldData.roomData.First(x => x.name.ToUpper() == currentlyEditingNodeSourceRoom).roomConnections[grabbedConnectionIndex] = room.name.ToUpper();
                                 currentlyEditingNodeSourceRoom = null;
@@ -271,6 +297,20 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                             }
                         }
                     }
+
+                    for (int i = 0; i < room.creatureSpawnPositions.Count; i++) {
+                        Vector2 denPosition = dragPosition + room.devPosition*0.5f + room.creatureSpawnPositions[i];
+                        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.rightClicked && scaledMousePos.X >= denPosition.X-4 && scaledMousePos.X <= denPosition.X+4 && scaledMousePos.Y >= denPosition.Y-4 && scaledMousePos.Y <= denPosition.Y+4 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
+                        if (clickedOnNode) {
+                            OpenDenMenu(room.creatureSpawnData.FindAll(x => room.creatureDenIndexToAbstractNodeMap[i] == x.pipeNumber && (x.slugcats == null || x.slugcats.Contains(selectedSlugcat))), room.name);
+                        }
+                    }
+                }
+                // Assigns the candidate hover room to the currently hovered room if it is not null.
+                // Without the null check, the current hovered room would be assigned null right after being assigned
+                // a room, messing with the view dragging code.
+                if (candidateHoveredRoom != null) {
+                    currentlyHoveredRoom = candidateHoveredRoom;
                 }
             }
             // If the mouse is not over a room and one is not currently being moved,
@@ -299,6 +339,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     dragPosition = scaledMousePos - relativeToMouse;
                 }
             }
+        }
+    }
+    void OpenDenMenu(List<SpawnData> spawnData, string roomName) {
+        if (spawnData.Count > 0 && GetParentWindow().updatables.FirstOrDefault(x => x is DenMenu denMenu && denMenu.spawnData.SequenceEqual(spawnData)) == default) {
+            Vector2 size = new Vector2(300, 500);
+            var denMenu = new DenMenu(GetParentWindow().size/2 - size/2, size, GetParentWindow(), spawnData, roomName);
+            GetParentWindow().AddChild(denMenu);
         }
     }
     void RenderRoom(IntPtr renderer, RoomData room) {
@@ -366,7 +413,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
 
             // Drawing the white diamond over the position of the connection
             bool hoveredOver = IsLayerInteractible(room.layer) && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6;
-            if (hoveredOver) {
+            if (hoveredOver && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room)) {
                 Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, biggerCircle.ToArray());
             }
             else {
@@ -375,7 +422,15 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         for (int i = 0; i < room.creatureSpawnPositions.Count; i++) {
             Vector2 spawnPosition = dragPosition + room.devPosition*0.5f + room.creatureSpawnPositions[i];
-            Utils.DrawGeometryWithVertices(renderer, spawnPosition, square.ToArray());
+            // Drawing the white square over the position of the creature den
+            bool hoveredOver = IsLayerInteractible(room.layer) && scaledMousePos.X >= spawnPosition.X-6 && scaledMousePos.X <= spawnPosition.X+6 && scaledMousePos.Y >= spawnPosition.Y-6 && scaledMousePos.Y <= spawnPosition.Y+6;
+
+            if (hoveredOver && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room)) {
+                Utils.DrawGeometryWithVertices(renderer, spawnPosition, biggerSquare.ToArray());
+            }
+            else {
+                Utils.DrawGeometryWithVertices(renderer, spawnPosition, square.ToArray());
+            }
         }
         Utils.WriteText(renderer, IntPtr.Zero, room.name, Utils.currentFont, dragPosition.X+room.devPosition.X*0.5f, dragPosition.Y+room.devPosition.Y*0.5f-11.5f, 11);
         SDL.SDL_SetRenderTarget(renderer, (IntPtr)null);

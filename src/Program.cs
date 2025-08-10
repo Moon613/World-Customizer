@@ -25,6 +25,7 @@ class Entry {
             main.Render();
             // Reset variable for the next loop
             main.clicked = false;
+            main.rightClicked = false;
             main.scrollY = 0;
         }
         } catch (Exception err) {
@@ -45,6 +46,7 @@ internal class Program {
     /// Is true if the mouse was clicked this frame.
     /// </summary>
     internal bool clicked = false;
+    internal bool rightClicked = false;
     internal float scrollY;
     internal string? folderToLoadFrom = null;
     internal WorldData? currentWorld;
@@ -115,7 +117,7 @@ internal class Program {
                         mouseDown = true;
                     }
                     else if (e.button.button == SDL.SDL_BUTTON_RIGHT) {
-
+                        rightClicked = true;
                     }
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:

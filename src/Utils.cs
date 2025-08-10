@@ -12,7 +12,33 @@ namespace WorldCustomizer;
 public static class Utils {
     public static IntPtr currentFont;
     public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
+    /// <summary>
+    /// The path to the image textures for the program, including an ending directory separator.
+    /// </summary>
+    public readonly static string TexturesPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "textures" + Path.DirectorySeparatorChar;
     public static string[] registeredSlugcats = File.ReadAllLines(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "slugcats.txt");
+    public static string[] registeredCreatures = File.ReadAllLines(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "creatures.txt");
+    public static void RefreshSlugcats() {
+        registeredSlugcats = File.ReadAllLines(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "slugcats.txt");
+    }
+    public static void RefreshCreatures() {
+        registeredCreatures = File.ReadAllLines(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "creatures.txt");
+    }
+    /// <summary>
+    /// Gets the width and height data from a .png file.<br/>
+    /// Gotten from https://stackoverflow.com/questions/60857830/finding-png-image-width-height-via-file-metadata-net-core-3-1-c-sharp
+    /// </summary>
+    public static Vector2 GetImageSize(string fileName) {
+        BinaryReader br = new BinaryReader(File.OpenRead(fileName));
+        br.BaseStream.Position = 16;
+        byte[] widthBytes = new byte[sizeof(int)];
+        for (int i = 0; i < sizeof(int); i++) widthBytes[sizeof(int) - 1 - i ] = br.ReadByte();
+        int width = BitConverter.ToInt32(widthBytes, 0);
+        byte[] heightBytes = new byte[sizeof(int)];
+        for (int i = 0; i < sizeof(int); i++) heightBytes[sizeof(int) - 1 - i] = br.ReadByte();
+        int height = BitConverter.ToInt32(heightBytes, 0);
+        return new Vector2(width, height);
+    }
     internal static WorldRenderer.Layers ByteToLayer(byte l) {
         WorldRenderer.Layers layer = l switch
         {
