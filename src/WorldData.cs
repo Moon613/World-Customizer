@@ -388,14 +388,14 @@ public class SpawnData {
         this.pipeNumber = pipeNumber;
         this.isALineage = false;
         this.creatureData = new CreatureData(creatureType, tags, count);
-        this. lineageSpawns = null;
+        this.lineageSpawns = new List<CreatureData>{new CreatureData("NONE", "", "0")};
     }
     public SpawnData(List<string>? slugcats, int pipeNumber, List<CreatureData> lineageSpawns) {
         this.slugcats = slugcats;
         this.pipeNumber = pipeNumber;
         this.isALineage = true;
-        this.creatureData = null;
-        this. lineageSpawns = lineageSpawns;
+        this.creatureData = new CreatureData("NONE", "", "1");
+        this.lineageSpawns = lineageSpawns;
     }
     public SpawnData(SpawnData rhs) {
         if (rhs.slugcats != null) {
@@ -409,7 +409,7 @@ public class SpawnData {
         }
         this.pipeNumber = rhs.pipeNumber;
         this.isALineage = rhs.isALineage;
-        this.creatureData = rhs.creatureData == null ? null : new CreatureData(rhs.creatureData);
+        this.creatureData = new CreatureData(rhs.creatureData);
         if (rhs.lineageSpawns != null) {
             this.lineageSpawns = new();
             foreach (var spawn in rhs.lineageSpawns) {
@@ -417,7 +417,7 @@ public class SpawnData {
             }
         }
         else {
-            this.lineageSpawns = null;
+            this.lineageSpawns = new List<CreatureData>{new CreatureData("NONE", "", "0")};
         }
     }
     public override string ToString() {
@@ -464,7 +464,7 @@ public class SpawnData {
             "cyan" or "cyanlizard" => "Cyanlizard",
             "red" or "redlizard" => "RedLizard",
             "spider" => "Spider",
-            "smallcentipede" => "SmallCentipede",
+            "smallcentipede" or "small centipede" => "SmallCentipede",
             "centi" or "centipede" => "Centipede",
             "redcenti" or "red centi" or "red centipede" or "redcentipede" => "RedCentipede",
             "dropwig" or "drop wig" or "drop bug" or "dropbug" => "DropBug",
@@ -534,8 +534,8 @@ public class SpawnData {
     public List<string>? slugcats;
     public readonly int pipeNumber;
     public bool isALineage;
-    public CreatureData? creatureData;
-    public List<CreatureData>? lineageSpawns;
+    public CreatureData creatureData;
+    public List<CreatureData> lineageSpawns;
     
     // A nested class to hold information about creature spawns. This helps organize data and reduce field clutter.
     public class CreatureData {

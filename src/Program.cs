@@ -27,6 +27,7 @@ class Entry {
             main.clicked = false;
             main.rightClicked = false;
             main.scrollY = 0;
+            main.pressedKey = null;
         }
         } catch (Exception err) {
             Utils.DebugLog(err);
@@ -51,6 +52,7 @@ internal class Program {
     internal string? folderToLoadFrom = null;
     internal WorldData? currentWorld;
     IntPtr gameController = (IntPtr)null;
+    internal SDL.SDL_Keycode? pressedKey;
 
     #pragma warning disable CS8618
     internal List<WindowRenderCombo> windows;
@@ -142,6 +144,9 @@ internal class Program {
                     break;
                 case SDL.SDL_EventType.SDL_MOUSEWHEEL:
                     scrollY = e.wheel.preciseY;
+                    break;
+                case SDL.SDL_EventType.SDL_KEYDOWN:
+                    pressedKey = SDL.SDL_GetKeyFromScancode(e.key.keysym.scancode);
                     break;
             }
         }

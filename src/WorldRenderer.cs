@@ -239,7 +239,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                 RoomData? candidateHoveredRoom = null;
                 foreach (RoomData room in WorldData.roomData) {
                     Vector2 roomPosition = dragPosition + room.devPosition*0.5f;
-                    if (currentlyEditingNodeSourceRoom == null && !dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X && scaledMousePos.X < roomPosition.X+room.size.X && scaledMousePos.Y > roomPosition.Y && scaledMousePos.Y < roomPosition.Y+room.size.Y && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
+                    if (currentlyEditingNodeSourceRoom == null && !dragged && IsLayerInteractible(room.layer) && scaledMousePos.X > roomPosition.X-2.5f && scaledMousePos.X < roomPosition.X+room.size.X+2.5f && scaledMousePos.Y > roomPosition.Y-12 && scaledMousePos.Y < roomPosition.Y+room.size.Y+4.5f && (currentlyHoveredRoom == null || (currentlyHoveredRoom != null && currentlyHoveredRoom.layer >= room.layer))) {
                         candidateHoveredRoom = room;
                         mouseOverRoom = true;
                     }
