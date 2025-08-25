@@ -312,6 +312,11 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                 if (candidateHoveredRoom != null) {
                     currentlyHoveredRoom = candidateHoveredRoom;
                 }
+                if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.rightClicked && currentlyEditingNodeSourceRoom != null) {
+                    WorldData.roomData.First(x => x.name.ToUpper() == currentlyEditingNodeSourceRoom).roomConnections[grabbedConnectionIndex] = "DISCONNECTED";
+                    currentlyEditingNodeSourceRoom = null;
+                    grabbedConnectionIndex = 0;
+                }
             }
             // If the mouse is not over a room and one is not currently being moved,
             // then the currently hovered room is set to null. The dragged check is because the room
