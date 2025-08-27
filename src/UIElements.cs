@@ -61,13 +61,83 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         #pragma warning disable CS8604, IDE0090, IDE0028
         contextMenu = new ContextMenu(new Vector2(0, 32), this);
         List<Button> buttons = Button.CreateButtonsVertical(new List<Tuple<string, Action<Button>>>{
-            new Tuple<string, Action<Button>>("Save", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save button");})),
+            new Tuple<string, Action<Button>>("Save", SaveToFile),
             new Tuple<string, Action<Button>>("Save As", new Action<Button>(_ => {Utils.DebugLog("Clicked on the Save As button");})),
             new Tuple<string, Action<Button>>("New", new Action<Button>(_ => {Utils.DebugLog("Clicked on the New button");})),
             new Tuple<string, Action<Button>>("Load", LoadFile)
         }, contextMenu, new Vector2(0, 0), 14, 5, 2);
         contextMenu.AssignButtons(buttons, new Vector2(5, 2));
         #pragma warning restore CS8604, IDE0090, IDE0028
+    }
+    public void SaveToFile(Button _) {
+        if (GetParentWindow().parentProgram.currentWorld != null) {
+            WorldData currentWorld = GetParentWindow().parentProgram.currentWorld!;
+            string RegionFolder = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "Saved_Regions" + Path.DirectorySeparatorChar + currentWorld.acronym.ToUpper();
+            if (!Directory.Exists(RegionFolder)) {
+                Directory.CreateDirectory(RegionFolder);
+            }
+            if (File.Exists(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt")) {
+                File.WriteAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "");
+            }
+            File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "ROOMS\n");
+            foreach (var room in currentWorld.roomData) {
+                File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", room.name.ToUpper()+" : ");
+                for (int i = 0; i < room.roomConnections.Count; i++) {
+                    File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", room.roomConnections[i].ToUpper()+(i<room.roomConnections.Count-1? ", " : "\n"));
+                }
+            }
+            File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "END ROOMS\n\nCREATURES\n");
+            foreach (var room in currentWorld.roomData) {
+                for (int i = 0; i < room.creatureSpawnData.Count; i++) {
+                    string s = "";
+                    // Detect any slugcat-exclusive spawning rules.
+                    if (room.creatureSpawnData[i].slugcats != null) {
+                        s += "(";
+                        if (room.creatureSpawnData[i].exclusive) {
+                            s += "X-";
+                        }
+                        foreach (var cat in room.creatureSpawnData[i].slugcats!) {
+                            s += cat.ToString() + ",";
+                        }
+                        s = s.TrimEnd(',');
+                        s += ")";
+                    }
+
+                    // Lineage Spawns
+                    if (room.creatureSpawnData[i].isALineage) {
+                        s += "LINEAGE : ";
+                        s += room.name.ToUpper() + " : ";
+                        s += room.creatureSpawnData[i].pipeNumber + " : ";
+                        foreach (var crit in room.creatureSpawnData[i].lineageSpawns!) {
+                            s += crit.type.ToString();
+                            if (crit.tags != "") {
+                                s += "-{" + crit.tags + "}";
+                            }
+                            s += "-" + crit.countOrChance;
+                            s += ", ";
+                        }
+                        s = s.TrimEnd();
+                        s = s.TrimEnd(',');
+                    }
+                    // Single creature spawns
+                    else {
+                        if (File.Exists(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt"))
+                        s += room.name.ToUpper() + " : ";
+                        s += room.creatureSpawnData[i].pipeNumber + "-";
+                        s += room.creatureSpawnData[i].creatureData!.type.ToString();
+                        if (File.Exists(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt"))
+                        if (room.creatureSpawnData[i].creatureData!.tags != "") {
+                            s += "-{" + room.creatureSpawnData[i].creatureData!.tags + "}";
+                        }
+                        s += "-" + room.creatureSpawnData[i].creatureData!.countOrChance;
+                    }
+                    s += "\n";
+                    File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", s);
+                }
+            }
+            File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "ENDCREATURES");
+            File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "\n\nBAT MIGRATION BLOCKAGES\nEND BAT MIGRATION BLOCKAGES");
+        }
     }
     public void LoadFile(Button _) {
         Signal(ContextMenu.RemoveCtxMenu);
@@ -680,7 +750,7 @@ class DenMenu : Draggable {
     internal List<SpawnData> spawnData;
     readonly string roomName;
     private int currentSpawnIndex;
-    Button prevButton, nextButton, deleteButton, addLineageSpawn, deleteLineageSpawn;
+    Button prevButton, nextButton, deleteButton, newButton, addLineageSpawn, deleteLineageSpawn;
     internal ButtonWithImage singleCreatureSelect;
     internal ScrollButton singleCreatureCount;
     internal TextField singleCreatureTags;
@@ -688,7 +758,7 @@ class DenMenu : Draggable {
     internal List<ScrollButton> lineageCreatureProgressions;
     internal List<TextField> lineageTags;
     Button[] slugcatButtons;
-    CheckBox lineageToggle;
+    CheckBox lineageToggle, exclusiveToggle;
     int heightForBelowSlugcatButtons;
     readonly static Vector2 buttonTextOffset = new Vector2(5, 6);
     const int StartHeightOfSlugcatButtons = 90;
@@ -700,8 +770,10 @@ class DenMenu : Draggable {
         this.roomName = roomName;
         currentSpawnIndex = 0;
         prevButton = new Button("Previous Spawn", this, new Vector2(10, 25), 125, 15, 16, new Vector2(5), true, ChangeCurrentSpawn);
-        nextButton = new Button("Next Spawn", this, new Vector2(150, 25), 90, 15, 16, new Vector2(5, 5), true, ChangeCurrentSpawn);
-        deleteButton = new Button("Delete", this, new Vector2(115, 55), 55, 15, 16, new Vector2(5, 5), true, DeleteSpawn);
+        nextButton = new Button("Next Spawn", this, new Vector2(150, 25), 90, 15, 16, new Vector2(5), true, ChangeCurrentSpawn);
+        deleteButton = new Button("Delete", this, new Vector2(135, 55), 55, 15, 16, new Vector2(5), true, DeleteSpawn);
+        newButton = new Button("New", this, new Vector2(210, 55), 30, 15, 16, new Vector2(10, 5), true, NewSpawn);
+        exclusiveToggle = new CheckBox(new Vector2(100, 55), new Vector2(25, 25), this, spawnData[currentSpawnIndex].exclusive, "checkmark.png", "x.png");
         slugcatButtons = new Button[Utils.registeredSlugcats.Length];
         for (int i = 0; i < Utils.registeredSlugcats.Length; i++) {
             slugcatButtons[i] = new Button(Utils.registeredSlugcats[i].Substring(0, 2), this, new Vector2((10+i*40)%280, StartHeightOfSlugcatButtons+(i/7*SlugButtonRowHeight)), 19, SlugButtonHeight, 16, new Vector2(5, 5), true, UpdateSelectedSlugcats, extraData: Utils.registeredSlugcats[i]);
@@ -726,6 +798,7 @@ class DenMenu : Draggable {
             lineageCreatureSelects.Add(new ButtonWithImage("NONE", "NONE.png", new Vector2(noneImageSize.X*(20f/noneImageSize.Y), 20), 2.5f, this, new Vector2(60, heightForBelowSlugcatButtons+40), (int)(LineageCreatureButtonWidth-2*noneImageSize.X), 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: 0));
             lineageCreatureProgressions.Add(new ScrollButton(new Vector2(10, heightForBelowSlugcatButtons+42.5f), new Vector2(45, 20), this, 0, 1, new Vector2(5, 2.5f), 16, "F2", 0, 0.01f));
             lineageTags.Add(new TextField(new Vector2(10, heightForBelowSlugcatButtons+70), new Vector2(279, 30), this, "", 17, 5));
+            size.Y = 312;
         }
         else {
             singleCreatureSelect = new ButtonWithImage("NONE", "NONE.png", new Vector2(noneImageSize.X*(20f/noneImageSize.Y), 20), 2.5f, this, new Vector2(135, heightForBelowSlugcatButtons+31), (int)(150-2*noneImageSize.X), 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: -1);
@@ -742,6 +815,7 @@ class DenMenu : Draggable {
 
                 lineageTags.Add(new TextField(new Vector2(10, heightForBelowSlugcatButtons+70+i*65), new Vector2(279, 30), this, spawnData[currentSpawnIndex].lineageSpawns[i].tags, 17, 5));
             }
+            this.size.Y = 312 + 65*(spawnData[currentSpawnIndex].lineageSpawns.Count-1);
         }
         addLineageSpawn = new Button("+", this, new Vector2(size.X/2 + 15, heightForBelowSlugcatButtons+40+(lineageCreatureSelects.Count)*65+10), 10, 15, 18, new Vector2(5, 2.5f), true, AddLineageSpawn);
         deleteLineageSpawn = new Button("-", this, new Vector2(size.X/2 - 25, heightForBelowSlugcatButtons+40+(lineageCreatureSelects.Count)*65+10), 10, 15, 18, new Vector2(5, 2.5f), true, DeleteLineageSpawn, greyedOut: lineageCreatureSelects.Count <= 1);
@@ -751,10 +825,14 @@ class DenMenu : Draggable {
         Utils.WriteText(renderer, window, roomName.ToUpper() + ", Den: " + spawnData[currentSpawnIndex].pipeNumber, Utils.currentFont, Position.X+5, Position.Y+5, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
         prevButton.Render(window, renderer);
         deleteButton.Render(window, renderer);
+        newButton.Render(window, renderer);
         nextButton.Render(window, renderer);
+        Utils.WriteText(renderer, window, "Exclusive:", Utils.currentFont, Position.X+10, Position.Y+60, 17);
+        exclusiveToggle.Render(window, renderer);
         foreach (Button button in slugcatButtons) {
             var rect = new SDL.SDL_FRect(){x=button.Position.X, y=button.Position.Y, w=button.size.X, h=button.size.Y};
-            if (spawnData[currentSpawnIndex].slugcats?.Contains((string)button.Data!) ?? false) {
+            bool containsSlugcat = spawnData[currentSpawnIndex].slugcats?.Contains((string)button.Data!) ?? false;
+            if ((!spawnData[currentSpawnIndex].exclusive && containsSlugcat) || (spawnData[currentSpawnIndex].exclusive && !containsSlugcat)) {
                 SDL.SDL_SetRenderDrawColor(renderer, 0, 255, 0, alpha);
                 SDL.SDL_RenderFillRectF(renderer, ref rect);
             }
@@ -792,7 +870,10 @@ class DenMenu : Draggable {
         nextButton.greyedOut = spawnData.Count <= 1;
         prevButton.Update();
         deleteButton.Update();
+        newButton.Update();
         nextButton.Update();
+        exclusiveToggle.Update();
+        spawnData[currentSpawnIndex].exclusive = exclusiveToggle.active;
         foreach (Button button in slugcatButtons) {
             button.Update();
         }
@@ -815,10 +896,23 @@ class DenMenu : Draggable {
             deleteLineageSpawn.Update();
         }
     }
+    private void NewSpawn(Button _) {
+        SpawnData newSpawnData = new SpawnData(null, false, spawnData[currentSpawnIndex].pipeNumber, "NONE");
+        if (currentSpawnIndex == spawnData.Count-1) {
+            spawnData.Add(newSpawnData);
+        }
+        else {
+            spawnData.Insert(currentSpawnIndex+1, newSpawnData);
+        }
+        currentSpawnIndex++;
+        ChangeCurrentSpawn(_);
+        Utils.DebugLog(spawnData[currentSpawnIndex].ToString());
+    }
     public void DeleteLineageSpawn(Button _) {
         spawnData[currentSpawnIndex].lineageSpawns.RemoveAt(spawnData[currentSpawnIndex].lineageSpawns.Count-1);
         lineageCreatureSelects.RemoveAt(lineageCreatureSelects.Count-1);
         lineageCreatureProgressions.RemoveAt(lineageCreatureProgressions.Count-1);
+        lineageTags.RemoveAt(lineageTags.Count-1);
         addLineageSpawn._position.Y -= 65;
         deleteLineageSpawn._position.Y -= 65;
         size.Y -= 65;
@@ -831,6 +925,7 @@ class DenMenu : Draggable {
         Vector2 noneImageSize = Utils.GetImageSize(Utils.TexturesPath + "NONE.png");
         lineageCreatureSelects.Add(new ButtonWithImage("NONE", "NONE.png", new Vector2(noneImageSize.X*(20f/noneImageSize.Y), 20), 2.5f, this, new Vector2(60, heightForBelowSlugcatButtons+40+lineageCreatureSelects.Count*65), (int)(LineageCreatureButtonWidth-2*noneImageSize.X), 15, 15, buttonTextOffset, true, OpenCreatureSelector, extraData: lineageCreatureSelects.Count));
         lineageCreatureProgressions.Add(new ScrollButton(new Vector2(10, heightForBelowSlugcatButtons+42.5f+lineageCreatureProgressions.Count*65), new Vector2(45, 20), this, 0, 1, new Vector2(5,2.5f), 16, "F2", 0, 0.01f));
+        lineageTags.Add(new TextField(new Vector2(10, heightForBelowSlugcatButtons+70+lineageTags.Count*65), new Vector2(280, 30), this, "NONE", 17, 5));
         addLineageSpawn._position.Y += 65;
         deleteLineageSpawn._position.Y += 65;
         size.Y += 65;
@@ -850,10 +945,20 @@ class DenMenu : Draggable {
         GetParentWindow().updatables.RemoveAll(x => x is CreatureSelector creatureSelector && creatureSelector.denMenu == this);
         GetParentWindow().renderables.RemoveAll(x => x is CreatureSelector creatureSelector && creatureSelector.denMenu == this);
         ButtonInfoUpdate(singleCreatureSelect, spawnData[currentSpawnIndex].creatureData?.type ?? "NONE");
+        lineageToggle.active = spawnData[currentSpawnIndex].isALineage;
     }
     public void DeleteSpawn(Button _) {
         GetParentWindow().parentProgram.currentWorld?.roomData.First(x => x.name == roomName).creatureSpawnData.Remove(spawnData[currentSpawnIndex]);
-        Close(_);
+        spawnData.RemoveAt(currentSpawnIndex);
+        if (spawnData.Count == 0) {
+            Close(_);
+        }
+        else {
+            if (currentSpawnIndex >= spawnData.Count) {
+                currentSpawnIndex--;
+            }
+            ChangeCurrentSpawn(_);
+        }
     }
     public void UpdateSelectedSlugcats(Button e) {
         if (spawnData[currentSpawnIndex].slugcats == null) {

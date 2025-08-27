@@ -211,6 +211,8 @@ unsafe class RoomData {
             Utils.DebugLog(spawnData[i]);
             // A list of slugcats that spawn the creature or lineage. null value indicates it spawns for any slugcat.
             List<string>? slugCatsThatSpawnThisCreature = null;
+            // If the slugcat list is exclusive or not. If it is, then creatures will spawn for all *except* the listed slugcats.
+            bool exclusive = false;
             // The pipe a creature can spawn out of. Since individual lines can contain different creatures
             // if they are not lineages, this is a list to acount for each creature. A lineage spawn will
             // only assign one value to the list in index 0.
@@ -242,21 +244,12 @@ unsafe class RoomData {
                 string[] slugcats = spawnData[i].Substring(indexToStart, spawnData[i].IndexOf(')')-indexToStart).Split(',');
                 
                 // This checks for if the spawn is exclusive to the slugcats listed, meaning it will spawn for all slugcats EXCEPT the ones listed here.
-                bool exclusive = spawnData[i].StartsWith("(X-");
+                exclusive = spawnData[i].StartsWith("(X-");
 
-                if (!exclusive) {
-                    // Adds each slugcat listed to the slugcats that spawn this creature, by parsing the string into a 'SlugcatStats.Name' ExtEnum.
-                    foreach (string cat in slugcats) {
-                        slugCatsThatSpawnThisCreature.Add(cat);
-                    }
-                }
-                else {
-                    // Iterates over all the current registered slugcats, and adds the ones that are NOT in the 'slugcats' list of strings
-                    foreach (string slug in Utils.registeredSlugcats) {
-                        if (!slugcats.Contains(slug)) {
-                            slugCatsThatSpawnThisCreature.Add(slug);
-                        }
-                    }
+                // Adds each slugcat listed to the slugcats that spawn this creature, by parsing the string into a 'SlugcatStats.Name' ExtEnum.
+                // If exclusive is true, then these are slugcats that will NOT spawn the creatures.
+                foreach (string cat in slugcats) {
+                    slugCatsThatSpawnThisCreature.Add(cat);
                 }
                 // The slugcat data has been parsed, so remove it from the data string.
                 spawnData[i] = spawnData[i].Substring(spawnData[i].IndexOf(')')+1);
@@ -357,12 +350,12 @@ unsafe class RoomData {
             }
             // Use different constructors based on if the data is a lineage or individual spawns.
             if (isALineage) {
-                this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[0], lineageSpawns!));
+                this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, exclusive, pipeNumber[0], lineageSpawns!));
                 Utils.DebugLog("Converted spawn data: " + this.creatureSpawnData.Last().ToString());
             }
             else {
                 for (int j = 0; j < critType.Count; j++){
-                    this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, pipeNumber[j], SpawnData.ConvertAliasToName(critType[j]!), tags[j], count[j]));
+                    this.creatureSpawnData.Add(new SpawnData(slugCatsThatSpawnThisCreature, exclusive, pipeNumber[j], SpawnData.ConvertAliasToName(critType[j]!), tags[j], count[j]));
                     Utils.DebugLog("Converted spawn data: " + this.creatureSpawnData.Last().ToString());
                 }
             }
@@ -383,21 +376,24 @@ unsafe class RoomData {
     }
 }
 public class SpawnData {
-    public SpawnData(List<string>? slugcats, int pipeNumber, string creatureType, string tags = "", string count = "1") {
-        this.slugcats = slugcats;
+    public SpawnData(List<string>? slugcats, bool exclusive, int pipeNumber, string creatureType, string tags = "", string count = "1") {
+        this.exclusive = exclusive;
+        this.slugcats = slugcats==null? null : new List<string>(slugcats);
         this.pipeNumber = pipeNumber;
         this.isALineage = false;
         this.creatureData = new CreatureData(creatureType, tags, count);
         this.lineageSpawns = new List<CreatureData>{new CreatureData("NONE", "", "0")};
     }
-    public SpawnData(List<string>? slugcats, int pipeNumber, List<CreatureData> lineageSpawns) {
-        this.slugcats = slugcats;
+    public SpawnData(List<string>? slugcats, bool exclusive, int pipeNumber, List<CreatureData> lineageSpawns) {
+        this.exclusive = exclusive;
+        this.slugcats = slugcats==null? null : new List<string>(slugcats);
         this.pipeNumber = pipeNumber;
         this.isALineage = true;
         this.creatureData = new CreatureData("NONE", "", "1");
         this.lineageSpawns = lineageSpawns;
     }
     public SpawnData(SpawnData rhs) {
+        this.exclusive = rhs.exclusive;
         if (rhs.slugcats != null) {
             this.slugcats = new();
             foreach (var cat in rhs.slugcats) {
@@ -430,6 +426,7 @@ public class SpawnData {
         else {
             toReturn += "Any Slugcat";
         }
+        toReturn += "Exclusive: " + exclusive;
         toReturn += "   ";
         toReturn += pipeNumber.ToString() + ",   ";
         if (!isALineage && creatureData != null) {
@@ -531,6 +528,7 @@ public class SpawnData {
             _ => alias,
         };
     }
+    public bool exclusive;
     public List<string>? slugcats;
     public readonly int pipeNumber;
     public bool isALineage;
