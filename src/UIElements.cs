@@ -89,6 +89,9 @@ internal class OptionBar : FocusableUIElement, IRenderable {
             File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "END ROOMS\n\nCREATURES\n");
             foreach (var room in currentWorld.roomData) {
                 for (int i = 0; i < room.creatureSpawnData.Count; i++) {
+                    if ((!room.creatureSpawnData[i].isALineage && room.creatureSpawnData[i].creatureData.type == "NONE") || (room.creatureSpawnData[i].isALineage && room.creatureSpawnData[i].lineageSpawns.FirstOrDefault(x => x.type != "NONE") == default)) {
+                        continue;
+                    }
                     string s = "";
                     // Detect any slugcat-exclusive spawning rules.
                     if (room.creatureSpawnData[i].slugcats != null) {
