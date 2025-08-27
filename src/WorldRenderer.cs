@@ -302,7 +302,12 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                         Vector2 denPosition = dragPosition + room.devPosition*0.5f + room.creatureSpawnPositions[i];
                         bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.rightClicked && scaledMousePos.X >= denPosition.X-4 && scaledMousePos.X <= denPosition.X+4 && scaledMousePos.Y >= denPosition.Y-4 && scaledMousePos.Y <= denPosition.Y+4 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
                         if (clickedOnNode) {
-                            OpenDenMenu(room.creatureSpawnData.FindAll(x => room.creatureDenIndexToAbstractNodeMap[i] == x.pipeNumber && (x.slugcats == null || (!x.exclusive && x.slugcats.Contains(selectedSlugcat)) || (x.exclusive && !x.slugcats.Contains(selectedSlugcat)))), room.name);
+                            List<SpawnData> spawns = room.creatureSpawnData.FindAll(x => room.creatureDenIndexToAbstractNodeMap[i] == x.pipeNumber && (x.slugcats == null || (!x.exclusive && x.slugcats.Contains(selectedSlugcat)) || (x.exclusive && !x.slugcats.Contains(selectedSlugcat))));
+                            if (spawns.Count == 0) {
+                                spawns.Add(new SpawnData(null, false, room.creatureDenIndexToAbstractNodeMap[i], "NONE"));
+                                room.creatureSpawnData.Add(spawns[0]);
+                            }
+                            OpenDenMenu(spawns, room.name);
                         }
                     }
                 }
@@ -347,8 +352,8 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
     }
     void OpenDenMenu(List<SpawnData> spawnData, string roomName) {
+        Vector2 size = new Vector2(300, 312);
         if (spawnData.Count > 0 && GetParentWindow().updatables.FirstOrDefault(x => x is DenMenu denMenu && denMenu.spawnData.SequenceEqual(spawnData)) == default) {
-            Vector2 size = new Vector2(300, 312);
             var denMenu = new DenMenu(GetParentWindow().size/2 - size/2, size, GetParentWindow(), spawnData, roomName);
             GetParentWindow().AddChild(denMenu);
         }
