@@ -48,6 +48,14 @@ public static class Utils {
         };
         return layer;
     }
+    internal static byte LayerToByte(WorldRenderer.Layers layers) {
+        return layers switch
+        {
+            WorldRenderer.Layers.Layer2 => 1,
+            WorldRenderer.Layers.Layer3 => 2,
+            _ => 0
+        };
+    }
     public static float Magnitude(this Vector2 vector) {
         return (float)Math.Sqrt(Math.Pow(vector.X, 2) + Math.Pow(vector.Y, 2));
     }

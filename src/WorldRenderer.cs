@@ -232,6 +232,8 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             // This is used to report if the mouse is currently over a room on the current frame, so that it is not immediantly de-selected when
             // not dragging it around.
             bool mouseOverRoom = false;
+            // This is used to determine if a node was already interacted with, so the room menu doesn't open if so.
+            bool intereactedWithNode = false;
             if (WorldData != null) {
                 // This candidate room is needed because otherwise rooms before the actual hovered room in the draw order would steal become the
                 // currently hovered room, activating all checks for if that room is the current one in the loop when they shouldn't have been true.
@@ -247,6 +249,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
                         Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
                         bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
+                        intereactedWithNode |= clickedOnNode;
                         // Gates break a lot rn so don't use them.
                         if (room.roomConnections[i].Contains("GATE")) {
                             continue;
@@ -301,6 +304,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     for (int i = 0; i < room.creatureSpawnPositions.Count; i++) {
                         Vector2 denPosition = dragPosition + room.devPosition*0.5f + room.creatureSpawnPositions[i];
                         bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.rightClicked && scaledMousePos.X >= denPosition.X-4 && scaledMousePos.X <= denPosition.X+4 && scaledMousePos.Y >= denPosition.Y-4 && scaledMousePos.Y <= denPosition.Y+4 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
+                        intereactedWithNode |= clickedOnNode;
                         if (clickedOnNode) {
                             List<SpawnData> spawns = room.creatureSpawnData.FindAll(x => room.creatureDenIndexToAbstractNodeMap[i] == x.pipeNumber && (x.slugcats == null || (!x.exclusive && x.slugcats.Contains(selectedSlugcat)) || (x.exclusive && !x.slugcats.Contains(selectedSlugcat))));
                             if (spawns.Count == 0) {
@@ -338,6 +342,9 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     relativeToMouse = scaledMousePos - dragPosition;
                 }
             }
+            if (GetParentWindow().IsFocused && !intereactedWithNode && GetParentWindow().parentProgram.rightClicked && currentlyHoveredRoom != null) {
+                OpenRoomMenu(currentlyHoveredRoom);
+            }
             if (GetParentWindow().IsFocused && !GetParentWindow().parentProgram.mouseDown) {
                 dragged = false;
             }
@@ -350,6 +357,9 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                 }
             }
         }
+    }
+    void OpenRoomMenu(RoomData room) {
+        GetParentWindow().AddChild(new RoomMenu(scaledMousePos, new Vector2(300, 500), GetParentWindow(), room));
     }
     void OpenDenMenu(List<SpawnData> spawnData, string roomName) {
         Vector2 size = new Vector2(300, 312);

@@ -749,6 +749,25 @@ class TextField : GenericUIElement, IAmInteractable, IRenderable {
         return parent!.GetParentWindow();
     }
 }
+class RoomMenu : Draggable {
+    RoomData roomData;
+    ScrollButton layerSelect;
+    public RoomMenu(Vector2 position, Vector2 size, GenericUIElement parent, RoomData roomData) : base(position, size, parent) {
+        this.roomData = roomData;
+        this.layerSelect = new ScrollButton(new Vector2(70, 40), new Vector2(20, 25), this, 1, 3, new Vector2(5), 16, "0", Utils.LayerToByte(roomData.layer)+1, 1);
+    }
+    public override void Render(IntPtr window, IntPtr renderer) {
+        base.Render(window, renderer);
+        Utils.WriteText(renderer, window, roomData.name.ToUpper(), Utils.currentFont, Position.X+5, Position.Y+5, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
+        Utils.WriteText(renderer, window, "Layer:", Utils.currentFont, Position.X+10, Position.Y+42.5f, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
+        layerSelect.Render(window, renderer);
+    }
+    public override void Update() {
+        base.Update();
+        layerSelect.Update();
+        roomData.layer = Utils.ByteToLayer((byte)(layerSelect.currentValue-1));
+    }
+}
 class DenMenu : Draggable {
     internal List<SpawnData> spawnData;
     readonly string roomName;
