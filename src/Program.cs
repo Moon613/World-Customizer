@@ -147,6 +147,12 @@ internal class Program {
                     break;
                 case SDL.SDL_EventType.SDL_KEYDOWN:
                     pressedKey = SDL.SDL_GetKeyFromScancode(e.key.keysym.scancode);
+                    if (e.key.keysym.scancode == SDL.SDL_Scancode.SDL_SCANCODE_UP) {
+                        scrollY = 1;
+                    }
+                    else if (e.key.keysym.scancode == SDL.SDL_Scancode.SDL_SCANCODE_DOWN) {
+                        scrollY = -1;
+                    }
                     break;
             }
         }
