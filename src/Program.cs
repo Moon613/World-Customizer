@@ -120,7 +120,8 @@ internal class Program {
             new Tuple<string, Action<Button>>("Preferences", optionBar.OpenPreferencesContextMenu),
             new Tuple<string, Action<Button>>("Layer 1", optionBar.ToggleLayer),
             new Tuple<string, Action<Button>>("Layer 2", optionBar.ToggleLayer),
-            new Tuple<string, Action<Button>>("Layer 3", optionBar.ToggleLayer)
+            new Tuple<string, Action<Button>>("Layer 3", optionBar.ToggleLayer),
+            new Tuple<string, Action<Button>>("View Subregions", optionBar.ToggleSubregionsView)
             }, optionBar, new Vector2(0, 0), 14, 5, 8));
     }
 

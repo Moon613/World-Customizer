@@ -13,6 +13,7 @@ namespace WorldCustomizer;
 public static class Utils {
     public const string DISCORD_APP_ID = "1411022466205224980";
     public static readonly DiscordRpcClient discordClient = new DiscordRpcClient(Utils.DISCORD_APP_ID){Logger=new DiscordRPC.Logging.ConsoleLogger(DiscordRPC.Logging.LogLevel.Info, true)};
+    public static Random RNG = new Random();
     public static IntPtr currentFont;
     public readonly static string DebugLogPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "debugLog.txt";
     /// <summary>

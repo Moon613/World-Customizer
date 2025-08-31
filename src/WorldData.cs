@@ -12,6 +12,7 @@ unsafe class WorldData {
     public List<RoomData> roomData;
     public string acronym;
     string fullParentDirName;
+    public Dictionary<string, SDL.SDL_Color> subregionColors;
     public WorldData(string worldFolderPath, IntPtr renderer) {
         fullParentDirName = worldFolderPath;
         acronym = worldFolderPath.Substring(worldFolderPath.LastIndexOf(Path.DirectorySeparatorChar)+1);
@@ -25,12 +26,16 @@ unsafe class WorldData {
         int roomsEnd = worldFileData.IndexOf("END ROOMS");
         string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).Split('\n');
 
+        subregionColors = new();
         roomData = new();
         foreach (string roomFile in Directory.GetFiles(roomsPath).Where(x => x.EndsWith(".txt") && !x.Contains("settings"))) {
             string roomName = Path.GetFileNameWithoutExtension(roomFile);
             string[] devMapData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "map_"+acronym+".txt").Split('\n');
 
             roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper()+":")) ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray(), roomConnections.FirstOrDefault(x => x.StartsWith(roomName.ToUpper() + " :") || x.StartsWith(roomName.ToUpper() + ":"))));
+            if (!subregionColors.ContainsKey(roomData.Last().subregion)) {
+                subregionColors.Add(roomData.Last().subregion, new SDL.SDL_Color(){r=(byte)Utils.RNG.Next(128, 256), g=(byte)Utils.RNG.Next(128, 256), b=(byte)Utils.RNG.Next(128, 256), a=255});
+            }
         }
     }
     /// <summary>
@@ -67,6 +72,7 @@ unsafe class RoomData {
     /// <summary>
     /// The CPU image of the room constructed from tile data
     /// </summary>
+    public string subregion;
     public IntPtr? roomTexture;
     public IntPtr roomSurface;
     public List<Vector2> roomConnectionPositions;
@@ -186,10 +192,17 @@ unsafe class RoomData {
             string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
             layer = Utils.ByteToLayer(Convert.ToByte(devMapDataSplit[4]));
             devPosition = new Vector2(float.Parse(devMapDataSplit[2]), -float.Parse(devMapDataSplit[3]));
+            if (devMapDataSplit.Length >= 6) {
+                subregion = devMapDataSplit[5];
+            }
+            else {
+                subregion = "";
+            }
         }
         else {
             layer = WorldRenderer.Layers.Layer1;
             devPosition = Vector2.Zero;
+            subregion = "";
         }
 
         Utils.DebugLog(roomConnections ?? "");

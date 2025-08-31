@@ -16,6 +16,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         Layer3 = 4
     }
     public string selectedSlugcat;
+    public bool viewSubregions;
     static List<SDL.SDL_Vertex> circle = [
         new(){position=new SDL.SDL_FPoint(){x=0, y=0}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
         new(){position=new SDL.SDL_FPoint(){x=0, y=3}, color=new SDL.SDL_Color(){r=255,g=255,b=255,a=255}},
@@ -142,6 +143,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         prepareToCutConnections = new List<string[]>();
         currentlyEditingNodeSourceRoom = null;
         selectedSlugcat = "White";
+        viewSubregions = false;
         layer1Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer2Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
         layer3Texture = SDL.SDL_CreateTexture(renderer, SDL.SDL_PIXELFORMAT_RGBA8888, (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET, (int)size.X, (int)size.Y);
@@ -381,7 +383,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         if (room.layer == Layers.Layer1) {
             SDL.SDL_SetRenderTarget(renderer, layer1Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, bkgFillModifier, bkgFillModifier, bkgFillModifier, 255);
+            if (GetParentMainWindow().worldRenderer.viewSubregions) {
+                var color = WorldData!.subregionColors[room.subregion];
+                SDL.SDL_SetRenderDrawColor(renderer, (byte)Math.Max(0, color.r-bkgFillModifier), (byte)Math.Max(0, color.g-bkgFillModifier), (byte)Math.Max(0, color.b-bkgFillModifier), color.a);
+            }
+            else {
+                SDL.SDL_SetRenderDrawColor(renderer, bkgFillModifier, bkgFillModifier, bkgFillModifier, 255);
+            }
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
@@ -389,7 +397,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         else if (room.layer == Layers.Layer2) {
             SDL.SDL_SetRenderTarget(renderer, layer2Texture);
-            SDL.SDL_SetRenderDrawColor(renderer,bkgFillModifier, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, 255);
+            if (GetParentMainWindow().worldRenderer.viewSubregions) {
+                var color = WorldData!.subregionColors[room.subregion];
+                SDL.SDL_SetRenderDrawColor(renderer, (byte)Math.Max(0, color.r-bkgFillModifier), (byte)Math.Max(0, color.g-bkgFillModifier), (byte)Math.Max(0, color.b-bkgFillModifier), color.a);
+            }
+            else {
+                SDL.SDL_SetRenderDrawColor(renderer,bkgFillModifier, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, 255);
+            }
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
@@ -397,7 +411,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         }
         else if (room.layer == Layers.Layer3) {
             SDL.SDL_SetRenderTarget(renderer, layer3Texture);
-            SDL.SDL_SetRenderDrawColor(renderer, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, bkgFillModifier, 255);
+            if (GetParentMainWindow().worldRenderer.viewSubregions) {
+                var color = WorldData!.subregionColors[room.subregion];
+                SDL.SDL_SetRenderDrawColor(renderer, (byte)Math.Max(0, color.r-bkgFillModifier), (byte)Math.Max(0, color.g-bkgFillModifier), (byte)Math.Max(0, color.b-bkgFillModifier), color.a);
+            }
+            else {
+                SDL.SDL_SetRenderDrawColor(renderer, (byte)(255 - bkgFillModifier*0.5f), bkgFillModifier, bkgFillModifier, 255);
+            }
             SDL.SDL_RenderFillRectF(renderer, ref outline);
             SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL.SDL_RenderDrawRectF(renderer, ref outline);

@@ -49,6 +49,9 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         contextMenu?.Update();
         foreach (Button button in options!) {
             button.Update();
+            if (button.text.StartsWith("Layer ")) {
+                button.greyedOut = GetParentMainWindow().worldRenderer.viewSubregions;
+            }
         }
     }
     public override void Signal(string text) {
@@ -178,6 +181,9 @@ internal class OptionBar : FocusableUIElement, IRenderable {
         if (button.text == "Layer 3" && GetParentWindow().worldRenderer is WorldRenderer worldRenderer3) {
             worldRenderer3.currentlyFocusedLayers ^= WorldRenderer.Layers.Layer3;
         }
+    }
+    internal void ToggleSubregionsView(Button _) {
+        GetParentMainWindow().worldRenderer.viewSubregions = !GetParentMainWindow().worldRenderer.viewSubregions;
     }
 }
 class SlugcatSelector : Draggable, IRenderable {
@@ -752,20 +758,29 @@ class TextField : GenericUIElement, IAmInteractable, IRenderable {
 class RoomMenu : Draggable {
     RoomData roomData;
     ScrollButton layerSelect;
+    TextField subregion;
     public RoomMenu(Vector2 position, Vector2 size, GenericUIElement parent, RoomData roomData) : base(position, size, parent) {
         this.roomData = roomData;
         this.layerSelect = new ScrollButton(new Vector2(70, 40), new Vector2(20, 25), this, 1, 3, new Vector2(5), 16, "0", Utils.LayerToByte(roomData.layer)+1, 1);
+        this.subregion = new TextField(new Vector2(10, 95), new Vector2(size.X-20, 20), this, roomData.subregion, 16, 2.5f);
     }
     public override void Render(IntPtr window, IntPtr renderer) {
         base.Render(window, renderer);
         Utils.WriteText(renderer, window, roomData.name.ToUpper(), Utils.currentFont, Position.X+5, Position.Y+5, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
         Utils.WriteText(renderer, window, "Layer:", Utils.currentFont, Position.X+10, Position.Y+42.5f, 16, new SDL.SDL_Color(){r=255, g=255, b=255, a=alpha});
         layerSelect.Render(window, renderer);
+        Utils.WriteText(renderer, window, "Subregion:", Utils.currentFont, Position.X+10, Position.Y+75, 16);
+        subregion.Render(window, renderer);
     }
     public override void Update() {
         base.Update();
         layerSelect.Update();
         roomData.layer = Utils.ByteToLayer((byte)(layerSelect.currentValue-1));
+        subregion.Update();
+        roomData.subregion = subregion.text;
+        if (!GetParentWindow().parentProgram.currentWorld!.subregionColors.ContainsKey(roomData.subregion)) {
+            GetParentWindow().parentProgram.currentWorld!.subregionColors.Add(roomData.subregion, new SDL.SDL_Color(){r=(byte)Utils.RNG.Next(128, 256), g=(byte)Utils.RNG.Next(128, 256), b=(byte)Utils.RNG.Next(128, 256), a=255});
+        }
     }
 }
 class DenMenu : Draggable {
