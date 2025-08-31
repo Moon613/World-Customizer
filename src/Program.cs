@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using DiscordRPC;
 using SDL2;
 
 #pragma warning disable CA1806
@@ -71,6 +72,32 @@ internal class Program {
         // Initilizes SDL
         if (SDL.SDL_Init(SDL.SDL_INIT_VIDEO | SDL.SDL_INIT_GAMECONTROLLER) < 0 || SDL_ttf.TTF_Init() < 0 || SDL_image.IMG_Init(SDL_image.IMG_InitFlags.IMG_INIT_PNG) == 0) {
             Utils.DebugLog($"There was an issue initializing SDL. {SDL.SDL_GetError()}");
+        }
+        // Initializes Discord RPC stuff
+        try {
+            Utils.discordClient.OnReady += (sender, e) => {
+                Utils.DebugLog("Connected to discord with user: "+e.User.Username);
+                Utils.DebugLog("Avatar: "+e.User.GetAvatarURL(User.AvatarFormat.WebP));
+                Utils.DebugLog("Decoration: " +e.User.GetAvatarDecorationURL());
+            };
+
+            Utils.discordClient.Initialize();
+            Utils.discordClient.SetPresence(new RichPresence() {
+                Details="Doin' World Stuff",
+                Assets = new Assets() {
+                    LargeImageKey="image_large",
+                    LargeImageText="World Customizer",
+                    SmallImageKey="image_small"
+                },
+                Buttons = new DiscordRPC.Button[] {
+                    new DiscordRPC.Button() {
+                        Label="Github Repo",
+                        Url="https://github.com/Moon613/World-Customizer"
+                    }
+                }
+            });
+        } catch (Exception err) {
+            Utils.DebugLog(err);
         }
 
         if (SDL.SDL_NumJoysticks() > 0) {
@@ -193,6 +220,7 @@ internal class Program {
     /// Clean up the resources that were created
     /// </summary>
     public void CleanUp() {
+        Utils.discordClient.Dispose();
         foreach (WindowRenderCombo window in windows) {
             SDL.SDL_DestroyRenderer(window.renderer);
             SDL.SDL_DestroyWindow(window.window);
