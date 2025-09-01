@@ -48,6 +48,10 @@ unsafe class WorldData {
     }
 }
 unsafe class RoomData {
+    /// <summary>
+    /// The position that the room is on the in-game map.
+    /// </summary>
+    public Vector2 cannonPosition;
     public Vector2 devPosition;
     /// <summary>
     /// The size of the room in real interactible tiles on both axis
@@ -190,6 +194,7 @@ unsafe class RoomData {
         // Set the dev position if it exists. If it does not, the room gets the default (0,0)
         if (devMapData != null) {
             string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
+            cannonPosition = new Vector2(float.Parse(devMapDataSplit[0]), -float.Parse(devMapDataSplit[1]));
             layer = Utils.ByteToLayer(Convert.ToByte(devMapDataSplit[4]));
             devPosition = new Vector2(float.Parse(devMapDataSplit[2]), -float.Parse(devMapDataSplit[3]));
             if (devMapDataSplit.Length >= 6) {

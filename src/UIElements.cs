@@ -143,6 +143,13 @@ internal class OptionBar : FocusableUIElement, IRenderable {
             }
             File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "ENDCREATURES");
             File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "\n\nBAT MIGRATION BLOCKAGES\nEND BAT MIGRATION BLOCKAGES");
+
+            if (File.Exists(RegionFolder + Path.DirectorySeparatorChar + "map_"+currentWorld.acronym+".txt")) {
+                File.WriteAllText(RegionFolder + Path.DirectorySeparatorChar + "map_"+currentWorld.acronym+".txt", "");
+            }
+            foreach (var room in currentWorld.roomData) {
+                File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "map_"+currentWorld.acronym+".txt", room.name.ToUpper() + ": " + room.cannonPosition.X + "><" + (-room.cannonPosition.Y) + "><" + room.devPosition.X + "><" + (-room.devPosition.Y) + "><" + Utils.LayerToByte(room.layer) + "><" + room.subregion + "\n");
+            }
         }
     }
     public void LoadFile(Button _) {
