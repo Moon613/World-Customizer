@@ -85,8 +85,11 @@ internal class OptionBar : FocusableUIElement, IRenderable {
             File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "ROOMS\n");
             foreach (var room in currentWorld.roomData) {
                 File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", room.name.ToUpper()+" : ");
-                for (int i = 0; i < room.roomConnections.Count; i++) {
-                    File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", room.roomConnections[i].ToUpper()+(i<room.roomConnections.Count-1? ", " : "\n"));
+                // Find all room connections that feature this room.
+                var roomConnections = GetParentMainWindow().parentProgram.currentWorld!.roomConnections.FindAll(x => x.sourceRoom.ToUpper() == room.name.ToUpper() || x.destinationRoom.ToUpper() == room.name.ToUpper());
+                // Need to sort the connections now.
+                for (int i = 0; i < roomConnections.Count; i++) {
+                    File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", roomConnections[i].destinationRoom.ToUpper()+(i<roomConnections.Count-1? ", " : "\n"));
                 }
             }
             File.AppendAllText(RegionFolder + Path.DirectorySeparatorChar + "world_"+currentWorld.acronym+".txt", "END ROOMS\n\nCREATURES\n");

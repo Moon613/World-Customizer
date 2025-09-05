@@ -13,6 +13,7 @@ unsafe class WorldData {
     public string acronym;
     string fullParentDirName;
     public Dictionary<string, SDL.SDL_Color> subregionColors;
+    public List<RoomConnection> roomConnections;
     public WorldData(string worldFolderPath, IntPtr renderer) {
         fullParentDirName = worldFolderPath;
         acronym = worldFolderPath.Substring(worldFolderPath.LastIndexOf(Path.DirectorySeparatorChar)+1);
@@ -24,15 +25,17 @@ unsafe class WorldData {
         string[] creatureSpawns = worldFileData.Substring(creaturesStart+10, creaturesEnd-creaturesStart-11).Split('\n');
         int roomsStart = worldFileData.IndexOf("ROOMS");
         int roomsEnd = worldFileData.IndexOf("END ROOMS");
-        string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).Split('\n');
+        string[] roomConnections = worldFileData.Substring(roomsStart+6, roomsEnd-roomsStart-7).ToUpper().Split('\n');
 
+        this.roomConnections = new();
         subregionColors = new();
         roomData = new();
         foreach (string roomFile in Directory.GetFiles(roomsPath).Where(x => x.EndsWith(".txt") && !x.Contains("settings"))) {
             string roomName = Path.GetFileNameWithoutExtension(roomFile);
             string[] devMapData = File.ReadAllText(worldFolderPath + Path.DirectorySeparatorChar + "map_"+acronym+".txt").Split('\n');
 
-            roomData.Add(new RoomData(this, roomName, File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.Contains(roomName.ToUpper()+":")) ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray(), roomConnections.FirstOrDefault(x => x.StartsWith(roomName.ToUpper() + " :") || x.StartsWith(roomName.ToUpper() + ":"))));
+            roomData.Add(new RoomData(this, roomName.ToUpper(), File.ReadAllText(roomFile), devMapData.FirstOrDefault(x => x.ToUpper().Contains(roomName.ToUpper()+":"))?.ToUpper() ?? null, creatureSpawns.Where(x => x.Contains(roomName.ToUpper())).ToArray(), roomConnections.FirstOrDefault(x => x.StartsWith(roomName.ToUpper() + " :") || x.StartsWith(roomName.ToUpper() + ":"))));
+
             if (!subregionColors.ContainsKey(roomData.Last().subregion)) {
                 subregionColors.Add(roomData.Last().subregion, new SDL.SDL_Color(){r=(byte)Utils.RNG.Next(128, 256), g=(byte)Utils.RNG.Next(128, 256), b=(byte)Utils.RNG.Next(128, 256), a=255});
             }
@@ -79,15 +82,13 @@ unsafe class RoomData {
     public string subregion;
     public IntPtr? roomTexture;
     public IntPtr roomSurface;
-    public List<Vector2> roomConnectionPositions;
-    public List<string> roomConnections;
     public List<Vector2> creatureSpawnPositions;
     public List<SpawnData> creatureSpawnData;
     public Dictionary<int, int> creatureDenIndexToAbstractNodeMap;
     /// <summary>
     /// This constructor creates an image of the room based on the room data, and fills in it's size
     /// </summary>
-    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData, string[] spawnData, string? roomConnections) {
+    public RoomData(WorldData worldData, string name, string roomFileData, string? devMapData, string[] spawnData, string? rawRoomConnections) {
         Utils.DebugLog(name);
         this.name = name;
         roomTexture = null;
@@ -123,7 +124,7 @@ unsafe class RoomData {
             waterLayer = 1;
         }
 
-        roomConnectionPositions = new();
+        List<Vector2> roomConnectionPositions = new();
         creatureSpawnPositions = new();
         creatureDenIndexToAbstractNodeMap = new();
         // We have the minimum needs to create the room surface, so we make the default now and fill it with useful pixels in the next part.
@@ -136,7 +137,7 @@ unsafe class RoomData {
                     var color = new SDL.SDL_Color(){r=255,g=0,b=0,a=255};
                     int[] singleTileData = Array.ConvertAll(tileData[j + (int)size.Y*i].Split(','), x => Convert.ToInt32(x));
 
-                    if (singleTileData[0] == 1 || singleTileData[0] == 4) {
+                    if (singleTileData[0] == 1) {
                         color.r = 0;
                         if (waterLayer == 1 && waterLayer > 0 && size.Y-j < waterLevel+2) {
                             color.b = 255;
@@ -152,10 +153,18 @@ unsafe class RoomData {
                             color.b = 255;
                             roomConnectionPositions.Add(new Vector2(i, j));
                         }
-                        else if (singleTileData.Length >= 3 && singleTileData[1] == 3 && singleTileData[2] == 4) {
-                            color.r = 255;
-                            color.b = 255;
-                            roomConnectionPositions.Add(new Vector2(i, j));
+                        else if (singleTileData.Length >= 3 && singleTileData[1] == 3) {
+                            if (singleTileData[2] == 4) {
+                                color.r = 255;
+                                color.b = 255;
+                                roomConnectionPositions.Add(new Vector2(i, j));
+                            }
+                            if (singleTileData[2] == 5) {
+                                color.r = 255;
+                                color.g = 255;
+                                creatureDenIndexToAbstractNodeMap.Add(creatureDenIndexToAbstractNodeMap.Count, creatureSpawnPositions.Count);
+                                creatureSpawnPositions.Add(new Vector2(i, j));
+                            }
                         }
                     }
                     else if (singleTileData[0] == 2 || singleTileData[0] == 3) {
@@ -193,7 +202,7 @@ unsafe class RoomData {
         
         // Set the dev position if it exists. If it does not, the room gets the default (0,0)
         if (devMapData != null) {
-            string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.RemoveEmptyEntries);
+            string[] devMapDataSplit = devMapData.Substring(devMapData.IndexOf(' ')+1).Split(["><"], StringSplitOptions.None);
             cannonPosition = new Vector2(float.Parse(devMapDataSplit[0]), -float.Parse(devMapDataSplit[1]));
             layer = Utils.ByteToLayer(Convert.ToByte(devMapDataSplit[4]));
             devPosition = new Vector2(float.Parse(devMapDataSplit[2]), -float.Parse(devMapDataSplit[3]));
@@ -210,16 +219,25 @@ unsafe class RoomData {
             subregion = "";
         }
 
-        Utils.DebugLog(roomConnections ?? "");
-        this.roomConnections = Enumerable.Repeat("DISCONNECTED", roomConnectionPositions.Count).ToList();
-        if (roomConnections != null) {
-            string[] roomsConnectedTo = roomConnections.Split(':')[1].Trim().Split(',');
+        Utils.DebugLog(rawRoomConnections ?? "");
+        List<string> roomConnections = Enumerable.Repeat("DISCONNECTED", roomConnectionPositions.Count).ToList();
+        if (rawRoomConnections != null) {
+            string[] roomsConnectedTo = rawRoomConnections.Split(':')[1].Trim().Split(',');
 
             int i = 0;
-            for (; i < roomsConnectedTo.Length && i < this.roomConnections.Count; i++) {
-                this.roomConnections[i] = roomsConnectedTo[i].Trim();
+            for (; i < roomsConnectedTo.Length && i < roomConnections.Count; i++) {
+                roomConnections[i] = roomsConnectedTo[i].Trim();
+                
+                Vector2 pos = FindConnectionEntrancePos(tileData, (int)size.Y, roomConnectionPositions[i], out int dir);
+                RoomConnection? connectedToRoom = worldData.roomConnections.FirstOrDefault(x => x.destinationRoom == name && x.sourceRoom == roomsConnectedTo[i].Trim());
+                if (connectedToRoom == default) {
+                    worldData.roomConnections.Add(new RoomConnection(name, roomsConnectedTo[i].Trim(), pos, dir, i));
+                }
+                else {
+                    connectedToRoom.SetDestinationInformation(pos, dir, i, false);
+                }
             }
-            if (i < this.roomConnections.Count) {
+            if (i < roomConnections.Count) {
                 Utils.DebugLog("ERROR, there may be extra room connections in the leditor file or you are missing some connections in your world file.\nMake sure to use DISCONNECTED if you want to leave some connections unused.");
             }
         }
@@ -391,6 +409,45 @@ unsafe class RoomData {
     }
     public override string ToString() {
         return name + $" {devPosition} {size} {layer}";
+    }
+    private static Vector2 FindConnectionEntrancePos(string[] geometry, int sizeY, Vector2 pos, out int dir) {
+        int? direction = null;
+        int count = 0;
+        int[] tileData = Array.ConvertAll(geometry[(int)(pos.Y + sizeY*pos.X)].Split(','), x => Convert.ToInt32(x));
+        while (tileData[0] != 4 && count <= 100) {
+            // Utils.DebugLog(geometry.Length + " " + (pos.Y + sizeY*(pos.X+1)) + " " + pos + " " + dir);
+            // Up 1
+            TryUp: if (direction != 1 && (pos.Y+1) + sizeY*pos.X < geometry.Length && (geometry[(int)((pos.Y+1) + sizeY*pos.X)].Contains("3") || geometry[(int)((pos.Y+1) + sizeY*pos.X)].Contains("4"))) {
+                direction = 3;
+                pos.Y += 1;
+                tileData = Array.ConvertAll(geometry[(int)(pos.Y + sizeY*pos.X)].Split(','), x => Convert.ToInt32(x));
+                goto TryUp;
+            }
+            // Right 
+            TryRight: if (direction != 0 && (pos.Y + sizeY*(pos.X+1)) < geometry.Length && (geometry[(int)(pos.Y + sizeY*(pos.X+1))].Contains("3") || geometry[(int)(pos.Y + sizeY*(pos.X+1))].Contains("4"))) {
+                direction = 2;
+                pos.X += 1;
+                tileData = Array.ConvertAll(geometry[(int)(pos.Y + sizeY*pos.X)].Split(','), x => Convert.ToInt32(x));
+                goto TryRight;
+            }
+            // Down 1
+            TryDown: if (direction != 3 && (pos.Y-1) + sizeY*pos.X >= 0 && (geometry[(int)((pos.Y-1) + sizeY*pos.X)].Contains("3") || geometry[(int)((pos.Y-1) + sizeY*pos.X)].Contains("4"))) {
+                direction = 1;
+                pos.Y -= 1;
+                tileData = Array.ConvertAll(geometry[(int)(pos.Y + sizeY*pos.X)].Split(','), x => Convert.ToInt32(x));
+                goto TryDown;
+            }
+            // Left 1
+            TryLeft: if (direction != 2 && pos.Y + sizeY*(pos.X-1) >= 0 && (geometry[(int)(pos.Y + sizeY*(pos.X-1))].Contains("3") || geometry[(int)(pos.Y + sizeY*(pos.X-1))].Contains("4"))) {
+                direction = 0;
+                pos.X -= 1;
+                tileData = Array.ConvertAll(geometry[(int)(pos.Y + sizeY*pos.X)].Split(','), x => Convert.ToInt32(x));
+                goto TryLeft;
+            }
+            count++;
+        }
+        dir = direction!.Value;
+        return pos;
     }
 }
 public class SpawnData {
@@ -568,5 +625,73 @@ public class SpawnData {
         public string type;
         public string tags;
         public string countOrChance;
+    }
+}
+public class RoomConnection {
+    public string sourceRoom;
+    public string destinationRoom;
+    public Vector2 sourcePosition;
+    public Vector2 destinationPosition;
+    public int sourceDir;
+    public int destinationDir;
+    public int sourceNodeIndex;
+    public int destinationNodeIndex;
+    public RoomConnection(string sourceRoom, string destinationRoom, Vector2 sourcePosition, int sourceDir, int sourceNodeIndex) {
+        this.sourceRoom = sourceRoom;
+        this.destinationRoom = destinationRoom;
+        this.sourcePosition = sourcePosition;
+        this.sourceDir = sourceDir;
+        this.sourceNodeIndex = sourceNodeIndex;
+    }
+    public override string ToString() {
+        return $"Connects {sourceRoom} to {destinationRoom}, at positions {sourcePosition}, {destinationPosition}, with indicies {sourceNodeIndex}, {destinationNodeIndex}";
+    }
+    public void SetDestinationInformation(Vector2 destinationPosition, int destinationDir, int destinationNodeIndex, bool flipped) {
+        if (flipped) {
+            sourcePosition = destinationPosition;
+            sourceDir = destinationDir;
+            sourceNodeIndex = destinationNodeIndex;
+        }
+        else {
+            this.destinationPosition = destinationPosition;
+            this.destinationDir = destinationDir;
+            this.destinationNodeIndex = destinationNodeIndex;
+        }
+    }
+    public void ClearDestinationInfo() {
+        destinationRoom = "DISCONNECTED";
+        destinationPosition = Vector2.Zero;
+        destinationNodeIndex = 0;
+        destinationDir = 0;
+    }
+    public void ClearSourceInfo() {
+        sourceRoom = "DISCONNECTED";
+        sourcePosition = Vector2.Zero;
+        sourceNodeIndex = 0;
+        sourceDir = 0;
+    }
+    public string GetSourceRoom(bool useDestination) {
+        return useDestination? destinationRoom : sourceRoom;
+    }
+    public Vector2 GetSourcePosition(bool useDestination) {
+        return useDestination? destinationPosition : sourcePosition;
+    }
+    public int GetSourceDir(bool useDestination) {
+        return useDestination? destinationDir : sourceDir;
+    }
+    public int GetSourceNodeIndex(bool useDestination) {
+        return useDestination? destinationNodeIndex : sourceNodeIndex;
+    }
+    public string GetDestinationRoom(bool useSource) {
+        return useSource? sourceRoom : destinationRoom;
+    }
+    public Vector2 GetDestinationPosition(bool useSource) {
+        return useSource? sourcePosition : destinationPosition;
+    }
+    public int GetDestinationDir(bool useSource) {
+        return useSource? sourceDir : destinationDir;
+    }
+    public int GetDestinationNodeIndex(bool useSource) {
+        return useSource? sourceNodeIndex : destinationNodeIndex;
     }
 }

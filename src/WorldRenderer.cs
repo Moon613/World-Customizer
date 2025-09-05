@@ -6,6 +6,7 @@ using System.Numerics;
 using SDL2;
 
 #nullable enable
+#pragma warning disable CA1806
 namespace WorldCustomizer;
 
 internal class WorldRenderer : FocusableUIElement, IRenderable {
@@ -126,7 +127,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     public IntPtr cutTexture;
     public string? currentlyEditingNodeSourceRoom;
     public int grabbedConnectionIndex = 0;
-    public readonly List<string[]> prepareToCutConnections;
+    public readonly List<RoomConnection> prepareToCutConnections;
     Vector2 scaledMousePos {get {
         SDL.SDL_GetMouseState(out int mouseX, out int mouseY);
         SDL.SDL_GetWindowSize(GetParentWindow().window, out int w, out int h);
@@ -140,7 +141,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
         originalSize = size;
         dragPosition = Vector2.Zero;
         currentlyHoveredRoom = null;
-        prepareToCutConnections = new List<string[]>();
+        prepareToCutConnections = new();
         currentlyEditingNodeSourceRoom = null;
         selectedSlugcat = "White";
         viewSubregions = false;
@@ -211,6 +212,12 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
     }
     public override void Update() {
         base.Update();
+        if (GetParentWindow().parentProgram.pressedKey == SDL.SDL_Keycode.SDLK_d) {
+            File.WriteAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "connections.txt", "");
+            foreach (var con in WorldData!.roomConnections) {
+                File.AppendAllText(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar + "connections.txt", con.ToString() + "\n");
+            }
+        }
         if (GetParentMainWindow().currentlyFocusedObject != this) {
             return;
         }
@@ -248,59 +255,13 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                         mouseOverRoom = true;
                     }
 
-                    for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
-                        Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
-                        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
-                        intereactedWithNode |= clickedOnNode;
-                        // Gates break a lot rn so don't use them.
-                        if (room.roomConnections[i].Contains("GATE")) {
-                            continue;
-                        }
-                        // This skips logic that would break if a connection is disconnected, without having to do extra math.
-                        else if (room.roomConnections[i] == "DISCONNECTED") {
-                            goto ThisConnectionIsDisconnected;
-                        }
-                        
-                        RoomData connectedRoom = WorldData.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
-                        int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
-                        if (indexInConnectedRoomConList == -1) {
-                            Utils.DebugLog($"Error finding room connection position from {room.name} to {connectedRoom.name}. Removed problematic connection.");
-                            room.roomConnections[i] = "DISCONNECTED";
-                            continue;
-                        }
-                        Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
-
-                        // This code is for cutting a room connection
-                        Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
-                        if (IsLayerInteractible(room.layer) && scaledMousePos.X >= centerPoint.X-10 && scaledMousePos.X <= centerPoint.X+10 && scaledMousePos.Y >= centerPoint.Y-10 && scaledMousePos.Y <= centerPoint.Y+10) {
-                            if (GetParentWindow().parentProgram.clicked) {
-                                room.roomConnections[i] = "DISCONNECTED";
-                                connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
-                            }
-                            else {
-                                prepareToCutConnections.Add([room.roomConnections[i], connectedRoom.roomConnections[indexInConnectedRoomConList]]);
-                            }
-                        }
-
-                        // If the node was clicked on and is connected, disconnect the other end.
-                        if (clickedOnNode) {
-                            connectedRoom.roomConnections[indexInConnectedRoomConList] = "DISCONNECTED";
-                        }
-                        ThisConnectionIsDisconnected:
-                        if (clickedOnNode) {
-                            if (currentlyEditingNodeSourceRoom == null && currentlyHoveredRoom == room) {
-                                currentlyHoveredRoom = null;
-                                room.roomConnections[i] = "DISCONNECTED";
-                                currentlyEditingNodeSourceRoom = room.name.ToUpper();
-                                grabbedConnectionIndex = i;
-                            }
-                            else if (currentlyEditingNodeSourceRoom != null && room.name.ToUpper() != currentlyEditingNodeSourceRoom) {
-                                room.roomConnections[i] = currentlyEditingNodeSourceRoom;
-                                WorldData.roomData.First(x => x.name.ToUpper() == currentlyEditingNodeSourceRoom).roomConnections[grabbedConnectionIndex] = room.name.ToUpper();
-                                currentlyEditingNodeSourceRoom = null;
-                                grabbedConnectionIndex = 0;
-                            }
-                        }
+                    List<RoomConnection> roomConnections = WorldData.roomConnections.FindAll(x => x.sourceRoom == room.name);
+                    for (int i = 0; i < roomConnections.Count; i++) {
+                        ConnectionUpdate(room, ref intereactedWithNode, roomConnections[i], false);
+                    }
+                    roomConnections = WorldData.roomConnections.FindAll(x => x.destinationRoom == room.name);
+                    for (int i = 0; i < roomConnections.Count; i++) {
+                        ConnectionUpdate(room, ref intereactedWithNode, roomConnections[i], true);
                     }
 
                     for (int i = 0; i < room.creatureSpawnPositions.Count; i++) {
@@ -324,7 +285,7 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                     currentlyHoveredRoom = candidateHoveredRoom;
                 }
                 if (GetParentWindow().IsFocused && GetParentWindow().parentProgram.rightClicked && currentlyEditingNodeSourceRoom != null) {
-                    WorldData.roomData.First(x => x.name.ToUpper() == currentlyEditingNodeSourceRoom).roomConnections[grabbedConnectionIndex] = "DISCONNECTED";
+                    WorldData.roomConnections.First(x => x.sourceRoom == currentlyEditingNodeSourceRoom && x.sourceNodeIndex == grabbedConnectionIndex).destinationRoom = "DISCONNECTED";
                     currentlyEditingNodeSourceRoom = null;
                     grabbedConnectionIndex = 0;
                 }
@@ -357,6 +318,128 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
                 else {
                     dragPosition = scaledMousePos - relativeToMouse;
                 }
+            }
+        }
+    }
+    void ConnectionUpdate(RoomData room, ref bool intereactedWithNode, RoomConnection roomConnection, bool flipped) {
+        Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + roomConnection.GetSourcePosition(flipped);
+        bool clickedOnNode = IsLayerInteractible(room.layer) && GetParentWindow().parentProgram.clicked && scaledMousePos.X >= connectionInThisRoom.X-6 && scaledMousePos.X <= connectionInThisRoom.X+6 && scaledMousePos.Y >= connectionInThisRoom.Y-6 && scaledMousePos.Y <= connectionInThisRoom.Y+6 && (currentlyEditingNodeSourceRoom != null || currentlyHoveredRoom == room);
+        intereactedWithNode |= clickedOnNode;
+        // Gates break a lot rn so don't use them.
+        if (roomConnection.GetDestinationRoom(flipped).Contains("GATE")) {
+            return;
+        }
+        // This skips logic that would break if a connection is disconnected, without having to do extra math.
+        else if (roomConnection.GetDestinationRoom(flipped) == "DISCONNECTED") {
+            goto ThisConnectionIsDisconnected;
+        }
+        
+        RoomData? connectedRoom = WorldData!.roomData.FirstOrDefault(x => x.name.ToUpper() == roomConnection.GetDestinationRoom(flipped));
+        if (connectedRoom == default) {
+            Utils.DebugLog($"Error finding room connection position from {roomConnection.GetSourceRoom(flipped)} to {roomConnection.GetDestinationRoom(flipped)}. Removed problematic connection.");
+            if (flipped) {
+                roomConnection.destinationRoom = "DISCONNECTED";
+            }
+            else {
+                roomConnection.sourceRoom = "DISCONNECTED";
+            }
+            return;
+        }
+        Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + roomConnection.GetDestinationPosition(flipped);
+
+        // This code is for cutting a room connection
+        Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
+        if (IsLayerInteractible(room.layer) && scaledMousePos.X >= centerPoint.X-10 && scaledMousePos.X <= centerPoint.X+10 && scaledMousePos.Y >= centerPoint.Y-10 && scaledMousePos.Y <= centerPoint.Y+10) {
+            if (GetParentWindow().parentProgram.clicked) {
+                Utils.DebugLog("Added new connection to roomConnections");
+                WorldData!.roomConnections.Add(new RoomConnection(roomConnection.destinationRoom, "DISCONNECTED", roomConnection.destinationPosition, roomConnection.destinationDir, roomConnection.destinationNodeIndex));
+                Utils.DebugLog($"Added {WorldData!.roomConnections.Last()}");
+                roomConnection.ClearDestinationInfo();
+            }
+            else {
+                prepareToCutConnections.Add(roomConnection);
+            }
+        }
+
+        // If the node was clicked on and is connected, disconnect the other end.
+        if (clickedOnNode) {
+            Utils.DebugLog("Added new connection to roomConnections");
+            WorldData!.roomConnections.Add(new RoomConnection(roomConnection.GetDestinationRoom(flipped), "DISCONNECTED", roomConnection.GetDestinationPosition(flipped), roomConnection.GetDestinationDir(flipped), roomConnection.GetDestinationNodeIndex(flipped)));
+            Utils.DebugLog($"Added {WorldData!.roomConnections.Last()}");
+            if (flipped) {
+                roomConnection.ClearSourceInfo();
+            }
+            else {
+                roomConnection.ClearDestinationInfo();
+            }
+        }
+        ThisConnectionIsDisconnected:
+        // If this node was clicked on...
+        if (clickedOnNode) {
+            // ...and there is not currently a connection being drawn (and this node's room is being hovered over)...
+            if (currentlyEditingNodeSourceRoom == null && currentlyHoveredRoom == room) {
+                // ... then we set the node that is to be connected to this.
+                currentlyHoveredRoom = null;
+                if (flipped) {
+                    roomConnection.sourceRoom = "DISCONNECTED";
+                }
+                else {
+                    roomConnection.destinationRoom = "DISCONNECTED";
+                }
+                currentlyEditingNodeSourceRoom = roomConnection.GetSourceRoom(flipped); //room.name.ToUpper();
+                grabbedConnectionIndex = roomConnection.GetSourceNodeIndex(flipped);
+            }
+            // ... and there is currently a connection already being drawn, ie a previous node from another room was already selected...
+            else if (currentlyEditingNodeSourceRoom != null && room.name.ToUpper() != currentlyEditingNodeSourceRoom) {
+                // Need to remove the connection, deleting it if it's now empty, then move the other connection's extra data to a new connection, and then copy this connection data over to the other connection.
+                Tuple<string, Vector2, int, int> connectionData;
+                if (roomConnection.sourceRoom.ToUpper() == room.name.ToUpper()) {
+                    connectionData = new(roomConnection.sourceRoom, roomConnection.sourcePosition, roomConnection.sourceDir, roomConnection.sourceNodeIndex);
+                    if (roomConnection.destinationRoom == "DISCONNECTED") {
+                        WorldData!.roomConnections.Remove(roomConnection);
+                        Utils.DebugLog($"Removed {roomConnection}");
+                    }
+                    else {
+                        roomConnection.sourceRoom = "DISCONNECTED";
+                    }
+                }
+                else {
+                    connectionData = new(roomConnection.destinationRoom, roomConnection.destinationPosition, roomConnection.destinationDir, roomConnection.destinationNodeIndex);
+                    if (roomConnection.sourceRoom == "DISCONNECTED") {
+                        WorldData!.roomConnections.Remove(roomConnection);
+                        Utils.DebugLog($"Removed {roomConnection}");
+                    }
+                    else {
+                        roomConnection.destinationRoom = "DISCONNECTED";
+                    }
+                }
+
+                var foundConnection = WorldData!.roomConnections.FirstOrDefault(x => x.sourceRoom.ToUpper() == currentlyEditingNodeSourceRoom.ToUpper() && x.sourceNodeIndex == grabbedConnectionIndex);
+                if (foundConnection != default) {
+                    if (foundConnection.destinationRoom != "DISCONNECTED") {
+                        WorldData!.roomConnections.Add(new RoomConnection(foundConnection.destinationRoom, "DISCONNECTED", foundConnection.destinationPosition, foundConnection.destinationDir, foundConnection.destinationNodeIndex));
+                    }
+                    Utils.DebugLog($"The current connection is {roomConnection}, and the found connection is: {foundConnection}");
+                    foundConnection.destinationRoom = connectionData.Item1;
+                    foundConnection.destinationPosition = connectionData.Item2;
+                    foundConnection.destinationDir = connectionData.Item3;
+                    foundConnection.destinationNodeIndex = connectionData.Item4;
+                }
+                else {
+                    Utils.DebugLog(currentlyEditingNodeSourceRoom.ToUpper() + " " + grabbedConnectionIndex);
+                    foundConnection = WorldData!.roomConnections.First(x => x.destinationRoom.ToUpper() == currentlyEditingNodeSourceRoom.ToUpper() && x.destinationNodeIndex == grabbedConnectionIndex);
+                    if (foundConnection.sourceRoom != "DISCONNECTED") {
+                        WorldData!.roomConnections.Add(new RoomConnection(foundConnection.sourceRoom, "DISCONNECTED", foundConnection.sourcePosition, foundConnection.sourceDir, foundConnection.sourceNodeIndex));
+                    }
+                    Utils.DebugLog($"The current connection is {roomConnection}, and the found connection is: {foundConnection}");
+                    foundConnection.sourceRoom = connectionData.Item1;
+                    foundConnection.sourcePosition = connectionData.Item2;
+                    foundConnection.sourceDir = connectionData.Item3;
+                    foundConnection.sourceNodeIndex = connectionData.Item4;
+                }
+                Utils.DebugLog($"The connection is now {foundConnection}, was the connection removed? {!WorldData!.roomConnections.Any(x => x == roomConnection)}");
+                currentlyEditingNodeSourceRoom = null;
+                grabbedConnectionIndex = 0;
             }
         }
     }
@@ -423,29 +506,35 @@ internal class WorldRenderer : FocusableUIElement, IRenderable {
             SDL.SDL_RenderDrawRectF(renderer, ref outline);
             SDL.SDL_RenderCopyF(renderer, (IntPtr)room.roomTexture, (IntPtr)null, ref r);
         }
-        for (int i = 0; i < room.roomConnectionPositions.Count; i++) {
-            Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + room.roomConnectionPositions[i];
+        
+        List<RoomConnection> roomConnections = WorldData!.roomConnections.FindAll(x => x.sourceRoom.ToUpper() == room.name.ToUpper());
+        List<bool> isSource = Enumerable.Repeat(false, roomConnections.Count).ToList();
+
+        roomConnections.AddRange(WorldData!.roomConnections.FindAll(x => x.destinationRoom.ToUpper() == room.name.ToUpper()));
+        isSource.AddRange(Enumerable.Repeat(true, roomConnections.Count-isSource.Count).ToList());
+
+        for (int i = 0; i < roomConnections.Count; i++) {
+            Vector2 connectionInThisRoom = dragPosition + room.devPosition*0.5f + roomConnections[i].GetSourcePosition(isSource[i]);
             // Gates break a lot rn so don't use them.
-            if (room.roomConnections[i].Contains("GATE")) {
+            if (roomConnections[i].GetDestinationRoom(isSource[i]).Contains("GATE")) {
                 continue;
             }
             // If the room connection is being formed by the user, the other end of the connection should be at the mouse position.
-            else if (room.name.ToUpper() == currentlyEditingNodeSourceRoom && i == grabbedConnectionIndex) {
+            else if (room.name.ToUpper() == currentlyEditingNodeSourceRoom && roomConnections[i].GetSourceNodeIndex(isSource[i]) == grabbedConnectionIndex) {
                 Utils.DrawGeometryWithVertices(renderer, connectionInThisRoom, biggerCircle.ToArray());
                 SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, scaledMousePos.X, scaledMousePos.Y);
                 continue;
             }
 
-            if (room.roomConnections[i] != "DISCONNECTED") {
-                RoomData connectedRoom = WorldData!.roomData.First(x => x.name.ToUpper() == room.roomConnections[i]);
-                int indexInConnectedRoomConList = connectedRoom.roomConnections.IndexOf(room.name.ToUpper());
-                Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + connectedRoom.roomConnectionPositions[indexInConnectedRoomConList];
+            if (roomConnections[i].GetDestinationRoom(isSource[i]) != "DISCONNECTED") {
+                RoomData connectedRoom = WorldData!.roomData.First(x => x.name.ToUpper() == roomConnections[i].GetDestinationRoom(isSource[i]));
+                Vector2 connectionInOtherRoomPosition = dragPosition + connectedRoom.devPosition*0.5f + roomConnections[i].GetDestinationPosition(isSource[i]);
                 
                 SDL.SDL_RenderDrawLineF(renderer, connectionInThisRoom.X, connectionInThisRoom.Y, connectionInOtherRoomPosition.X, connectionInOtherRoomPosition.Y);
 
                 // This code is for cutting a room connection
                 Vector2 centerPoint = connectionInThisRoom + 0.5f*(connectionInOtherRoomPosition - connectionInThisRoom);
-                if (prepareToCutConnections.FirstOrDefault(x => x[0] == room.roomConnections[i] && x[1] == connectedRoom.roomConnections[indexInConnectedRoomConList]) != default) {
+                if (prepareToCutConnections.FirstOrDefault(x => x == roomConnections[i]) != default) {
                     var rect = new SDL.SDL_FRect(){x=centerPoint.X-10, y=centerPoint.Y-10, w=20, h=20};
                     SDL.SDL_RenderCopyF(renderer, cutTexture, (IntPtr)null, ref rect);
                 }
